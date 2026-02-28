@@ -14,6 +14,7 @@
 		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
 	},
 	"dependencies": {
+		"@btc-vision/walletconnect": "^1.10.3",
 		"@opennextjs/cloudflare": "^1.17.1",
 		"@tanstack/react-query": "^5.90.21",
 		"@tanstack/react-query-devtools": "^5.91.3",

@@ -9,6 +9,8 @@ import type {
   ListingQueryParams,
   ActivityQueryParams,
   AgentActionResponse,
+  AgentRequestAuth,
+  RegisterAgentRequest,
   MintRequest,
   ListRequest,
   BidRequest,
@@ -16,6 +18,7 @@ import type {
   CancelRequest,
   DeployCollectionRequest,
   DeployCollectionResponse,
+  OwnedAgentsResponse,
 } from "@/types";
 
 export class ApiError extends Error {
@@ -107,54 +110,114 @@ export function fetchActivity(
   );
 }
 
-// ── Agent endpoints (stub) ──
+export function fetchAgentsByOwner(address: string): Promise<OwnedAgentsResponse> {
+  return request<OwnedAgentsResponse>(
+    `/public/agents-by-owner/${encodeURIComponent(address)}`,
+  );
+}
+
+// ── Agent endpoints ──
+
+function getBodyAddress(body: unknown): string | null {
+  if (typeof body !== "object" || body === null) return null;
+  const candidate = (body as { address?: unknown }).address;
+  if (typeof candidate !== "string") return null;
+  const normalized = candidate.trim();
+  return normalized.length > 0 ? normalized : null;
+}
 
 function agentRequest<T>(
   path: string,
   body: unknown,
-  signature = "mock-signature",
-  publicKey = "mock-public-key",
+  auth: AgentRequestAuth,
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    "X-Agent-Signature": auth.signature,
+    "X-Agent-PublicKey": auth.publicKey,
+  };
+
+  const address = getBodyAddress(body);
+  if (address) {
+    headers["X-Agent-Address"] = address;
+  }
+
   return request<T>(path, {
     method: "POST",
-    headers: {
-      "X-Agent-Signature": signature,
-      "X-Agent-PublicKey": publicKey,
-    },
+    headers,
     body: JSON.stringify(body),
   });
 }
 
 export function registerAgent(
-  publicKey: string,
-  proof: string,
-  address: string,
+  req: RegisterAgentRequest,
+  auth: AgentRequestAuth,
 ): Promise<AgentActionResponse> {
-  return agentRequest("/agent/register", { publicKey, proof, address });
+  return agentRequest("/agent/register", req, auth);
 }
 
-export function mintNft(req: MintRequest): Promise<AgentActionResponse> {
-  return agentRequest("/agent/mint", req);
+export function mintNft(
+  req: MintRequest,
+  auth: AgentRequestAuth,
+): Promise<AgentActionResponse> {
+  return agentRequest("/agent/mint", req, auth);
 }
 
-export function listNft(req: ListRequest): Promise<AgentActionResponse> {
-  return agentRequest("/agent/list", req);
+export function listNft(
+  req: ListRequest,
+  auth: AgentRequestAuth,
+): Promise<AgentActionResponse> {
+  return agentRequest("/agent/list", req, auth);
 }
 
-export function placeBid(req: BidRequest): Promise<AgentActionResponse> {
-  return agentRequest("/agent/bid", req);
+export function placeBid(
+  req: BidRequest,
+  auth: AgentRequestAuth,
+): Promise<AgentActionResponse> {
+  return agentRequest("/agent/bid", req, auth);
 }
 
-export function buyNft(req: BuyRequest): Promise<AgentActionResponse> {
-  return agentRequest("/agent/buy", req);
+export function buyNft(
+  req: BuyRequest,
+  auth: AgentRequestAuth,
+): Promise<AgentActionResponse> {
+  return agentRequest("/agent/buy", req, auth);
 }
 
-export function cancelListing(req: CancelRequest): Promise<AgentActionResponse> {
-  return agentRequest("/agent/cancel", req);
+export function cancelListing(
+  req: CancelRequest,
+  auth: AgentRequestAuth,
+): Promise<AgentActionResponse> {
+  return agentRequest("/agent/cancel", req, auth);
 }
 
 export function deployCollection(
   req: DeployCollectionRequest,
+  auth: AgentRequestAuth,
 ): Promise<DeployCollectionResponse> {
-  return agentRequest("/agent/deploy-collection", req);
+  return agentRequest("/agent/deploy-collection", req, auth);
+}
+
+export interface WalletSignatureResult {
+  readonly signature: string;
+}
+
+export async function buildAgentRequestAuth(
+  body: unknown,
+  mldsaPublicKey: string | null,
+  signMLDSAMessage: (message: string) => Promise<WalletSignatureResult | null>,
+): Promise<AgentRequestAuth> {
+  if (!mldsaPublicKey) {
+    throw new ApiError(401, "Wallet ML-DSA public key is missing");
+  }
+
+  const payload = JSON.stringify(body);
+  const signatureResult = await signMLDSAMessage(payload);
+  if (!signatureResult?.signature) {
+    throw new ApiError(401, "Wallet signature rejected");
+  }
+
+  return {
+    signature: signatureResult.signature,
+    publicKey: mldsaPublicKey,
+  };
 }

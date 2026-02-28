@@ -42,6 +42,9 @@ const blockReservedAmountPointer: u16 = Blockchain.nextPointer;
 const totalActiveReservedPointer: u16 = Blockchain.nextPointer;
 const blocksWithReservationsPointer: u16 = Blockchain.nextPointer;
 const mintEnabledPointer: u16 = Blockchain.nextPointer;
+const agentRegistryPointer: u16 = Blockchain.nextPointer;
+const agentOwnerPointer: u16 = Blockchain.nextPointer;
+const agentCountPointer: u16 = Blockchain.nextPointer;
 
 @final
 export class MyNFT extends OP721 {
@@ -56,6 +59,9 @@ export class MyNFT extends OP721 {
 
     private readonly treasuryAddress: StoredString;
     private readonly mintEnabled: StoredBoolean;
+    private readonly agentRegistry: StoredMapU256; // agentAddress -> bool
+    private readonly agentOwner: StoredMapU256; // agentAddress -> ownerAddress
+    private readonly agentCount: StoredU256;
 
     // User reservations
     private userReservationBlock: StoredMapU256; // address -> block number when reserved
@@ -75,6 +81,9 @@ export class MyNFT extends OP721 {
 
         this.treasuryAddress = new StoredString(treasuryAddressPointer);
         this.mintEnabled = new StoredBoolean(mintEnabledPointer, false);
+        this.agentRegistry = new StoredMapU256(agentRegistryPointer);
+        this.agentOwner = new StoredMapU256(agentOwnerPointer);
+        this.agentCount = new StoredU256(agentCountPointer, EMPTY_POINTER);
     }
 
     private _blocksWithReservations: Potential<StoredU64Array> = null; // Sorted list of blocks with reservations
@@ -140,6 +149,95 @@ export class MyNFT extends OP721 {
     public isMintEnabled(_: Calldata): BytesWriter {
         const response: BytesWriter = new BytesWriter(1);
         response.writeBoolean(<boolean>this.mintEnabled.value);
+        return response;
+    }
+
+    @method({ name: 'agent', type: ABIDataTypes.ADDRESS })
+    public registerAgent(calldata: Calldata): BytesWriter {
+        this.onlyDeployer(Blockchain.tx.sender);
+
+        const agentAddress: Address = calldata.readAddress();
+        const agentKey: u256 = this._u256FromAddress(agentAddress);
+
+        if (this.agentRegistry.get(agentKey).isZero()) {
+            this.agentRegistry.set(agentKey, u256.One);
+            this.agentCount.value = SafeMath.add(this.agentCount.value, u256.One);
+        }
+
+        if (this.agentOwner.get(agentKey).isZero()) {
+            this.agentOwner.set(agentKey, agentKey);
+        }
+
+        return new BytesWriter(0);
+    }
+
+    @method(
+        { name: 'agent', type: ABIDataTypes.ADDRESS },
+        { name: 'owner', type: ABIDataTypes.ADDRESS },
+    )
+    public registerAgentWithOwner(calldata: Calldata): BytesWriter {
+        this.onlyDeployer(Blockchain.tx.sender);
+
+        const agentAddress: Address = calldata.readAddress();
+        const ownerAddress: Address = calldata.readAddress();
+        const agentKey: u256 = this._u256FromAddress(agentAddress);
+        const ownerKey: u256 = this._u256FromAddress(ownerAddress);
+
+        if (this.agentRegistry.get(agentKey).isZero()) {
+            this.agentRegistry.set(agentKey, u256.One);
+            this.agentCount.value = SafeMath.add(this.agentCount.value, u256.One);
+        }
+
+        this.agentOwner.set(agentKey, ownerKey);
+
+        return new BytesWriter(0);
+    }
+
+    @method({ name: 'agent', type: ABIDataTypes.ADDRESS })
+    public revokeAgent(calldata: Calldata): BytesWriter {
+        this.onlyDeployer(Blockchain.tx.sender);
+
+        const agentAddress: Address = calldata.readAddress();
+        const agentKey: u256 = this._u256FromAddress(agentAddress);
+
+        if (!this.agentRegistry.get(agentKey).isZero()) {
+            this.agentRegistry.set(agentKey, u256.Zero);
+            this.agentOwner.set(agentKey, u256.Zero);
+            if (!this.agentCount.value.isZero()) {
+                this.agentCount.value = SafeMath.sub(this.agentCount.value, u256.One);
+            }
+        }
+
+        return new BytesWriter(0);
+    }
+
+    @method({ name: 'account', type: ABIDataTypes.ADDRESS })
+    @returns({ name: 'result', type: ABIDataTypes.BOOL })
+    public isAgent(calldata: Calldata): BytesWriter {
+        const account: Address = calldata.readAddress();
+        const accountKey: u256 = this._u256FromAddress(account);
+        const response: BytesWriter = new BytesWriter(1);
+        response.writeBoolean(!this.agentRegistry.get(accountKey).isZero());
+        return response;
+    }
+
+    @method()
+    @returns({ name: 'count', type: ABIDataTypes.UINT256 })
+    public getAgentCount(_: Calldata): BytesWriter {
+        const response: BytesWriter = new BytesWriter(U256_BYTE_LENGTH);
+        response.writeU256(this.agentCount.value);
+        return response;
+    }
+
+    @method({ name: 'agent', type: ABIDataTypes.ADDRESS })
+    @returns({ name: 'owner', type: ABIDataTypes.ADDRESS })
+    public getAgentOwner(calldata: Calldata): BytesWriter {
+        const agentAddress: Address = calldata.readAddress();
+        const agentKey: u256 = this._u256FromAddress(agentAddress);
+        const ownerAddress: Address = this._addressFromU256(this.agentOwner.get(agentKey));
+
+        const response: BytesWriter = new BytesWriter(32);
+        response.writeAddress(ownerAddress);
         return response;
     }
 

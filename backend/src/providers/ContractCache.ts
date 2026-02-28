@@ -10,9 +10,11 @@ const F = BitcoinAbiTypes.Function;
 const NFT_ABI: BitcoinInterfaceAbi = [
     { name: 'mint', type: F, inputs: [{ name: 'to', type: ABIDataTypes.ADDRESS }, { name: 'tokenURI', type: ABIDataTypes.STRING }], outputs: [{ name: 'tokenId', type: ABIDataTypes.UINT256 }] },
     { name: 'registerAgent', type: F, inputs: [{ name: 'agent', type: ABIDataTypes.ADDRESS }], outputs: [] },
+    { name: 'registerAgentWithOwner', type: F, inputs: [{ name: 'agent', type: ABIDataTypes.ADDRESS }, { name: 'owner', type: ABIDataTypes.ADDRESS }], outputs: [] },
     { name: 'revokeAgent', type: F, inputs: [{ name: 'agent', type: ABIDataTypes.ADDRESS }], outputs: [] },
     { name: 'isAgent', type: F, inputs: [{ name: 'account', type: ABIDataTypes.ADDRESS }], outputs: [{ name: 'result', type: ABIDataTypes.BOOL }] },
     { name: 'getAgentCount', type: F, inputs: [], outputs: [{ name: 'count', type: ABIDataTypes.UINT256 }] },
+    { name: 'getAgentOwner', type: F, inputs: [{ name: 'agent', type: ABIDataTypes.ADDRESS }], outputs: [{ name: 'owner', type: ABIDataTypes.ADDRESS }] },
     { name: 'getNextTokenId', type: F, inputs: [], outputs: [{ name: 'tokenId', type: ABIDataTypes.UINT256 }] },
     { name: 'ownerOf', type: F, inputs: [{ name: 'tokenId', type: ABIDataTypes.UINT256 }], outputs: [{ name: 'owner', type: ABIDataTypes.ADDRESS }] },
     { name: 'balanceOf', type: F, inputs: [{ name: 'owner', type: ABIDataTypes.ADDRESS }], outputs: [{ name: 'balance', type: ABIDataTypes.UINT256 }] },

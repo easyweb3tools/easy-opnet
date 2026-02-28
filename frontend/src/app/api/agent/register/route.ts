@@ -25,11 +25,25 @@ export async function POST(request: NextRequest) {
     publicKey?: string;
     proof?: string;
     address?: string;
+    ownerAddress?: string;
+    ownerPublicKey?: string;
+    ownerSignature?: string;
   };
 
-  if (!body.publicKey || !body.proof || !body.address) {
+  if (
+    !body.publicKey
+    || !body.proof
+    || !body.address
+    || !body.ownerAddress
+    || !body.ownerPublicKey
+    || !body.ownerSignature
+  ) {
     return NextResponse.json(
-      { success: false, error: "publicKey, proof, and address are required" },
+      {
+        success: false,
+        error:
+          "publicKey, proof, address, ownerAddress, ownerPublicKey, and ownerSignature are required",
+      },
       { status: 400 },
     );
   }

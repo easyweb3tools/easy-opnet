@@ -14,7 +14,7 @@ import { getMissingChainConfigKeys, getMissingNftConfigKeys, readinessErrorMessa
 import { env } from '../config/env.js';
 import { getListingState, getListingCount } from '../market/EscrowManager.js';
 import { getTokenOwner, getTokenURI, getBalanceOf } from '../nft/TokenIndexer.js';
-import { isRegisteredAgent } from '../agents/AgentRegistry.js';
+import { getAgentsByOwner, isRegisteredAgent } from '../agents/AgentRegistry.js';
 import { getProvider } from '../providers/ProviderManager.js';
 
 // ── Routes ──
@@ -463,6 +463,20 @@ publicRoutes.get('/activity', (c) => {
         limit,
     };
     return c.json({ success: true, data: response });
+});
+
+// GET /api/public/agents-by-owner/:address
+publicRoutes.get('/agents-by-owner/:address', (c) => {
+    const ownerAddress = c.req.param('address').trim().toLowerCase();
+    const agents = getAgentsByOwner(ownerAddress);
+
+    return c.json({
+        success: true,
+        data: {
+            ownerAddress,
+            agents,
+        },
+    });
 });
 
 // GET /api/public/balance/:address

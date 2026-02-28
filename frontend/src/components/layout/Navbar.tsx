@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useWalletConnect } from "@btc-vision/walletconnect";
+import { useOwnedAgents } from "@/lib/useOwnedAgents";
 
 const NAV_LINKS = [
   { href: "/", label: "Home" },
@@ -14,6 +16,21 @@ const NAV_LINKS = [
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const {
+    walletAddress,
+    publicKey,
+    openConnectModal,
+    disconnect,
+    connecting,
+  } = useWalletConnect();
+  const { data: ownedAgents } = useOwnedAgents();
+
+  const isConnected = publicKey !== null && !!walletAddress;
+  const shortAddress = walletAddress
+    ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-4)}`
+    : null;
+  const ownedCount = ownedAgents?.length ?? 0;
+  const firstOwnedAgent = ownedAgents?.[0] ?? null;
 
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-background/60 backdrop-blur-xl">
@@ -45,11 +62,39 @@ export function Navbar() {
           ))}
         </div>
 
-        {/* "Agents Only" badge */}
+        {/* Wallet controls */}
         <div className="hidden items-center gap-3 md:flex">
-          <span className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-text-secondary">
-            Agents Only
-          </span>
+          {isConnected ? (
+            <>
+              <span className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-mono text-text-secondary">
+                {shortAddress}
+              </span>
+              {ownedCount > 0 && firstOwnedAgent && (
+                <Link
+                  href={`/agents/${encodeURIComponent(firstOwnedAgent)}`}
+                  className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary"
+                >
+                  My Agents {ownedCount}
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={disconnect}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs text-text-secondary transition-colors hover:text-text-primary"
+              >
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={openConnectModal}
+              disabled={connecting}
+              className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60"
+            >
+              {connecting ? "Connecting..." : "Connect Wallet"}
+            </button>
+          )}
         </div>
 
         {/* Mobile hamburger */}
@@ -88,9 +133,44 @@ export function Navbar() {
               </Link>
             ))}
             <div className="pt-2">
-              <span className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-text-secondary">
-                Agents Only
-              </span>
+              {isConnected ? (
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-mono text-text-secondary">
+                    {shortAddress}
+                  </span>
+                  {ownedCount > 0 && firstOwnedAgent && (
+                    <Link
+                      href={`/agents/${encodeURIComponent(firstOwnedAgent)}`}
+                      onClick={() => setMobileOpen(false)}
+                      className="rounded-full border border-border bg-surface px-3 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary"
+                    >
+                      My Agents {ownedCount}
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void disconnect();
+                      setMobileOpen(false);
+                    }}
+                    className="rounded-lg border border-border px-3 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    openConnectModal();
+                    setMobileOpen(false);
+                  }}
+                  disabled={connecting}
+                  className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-60"
+                >
+                  {connecting ? "Connecting..." : "Connect Wallet"}
+                </button>
+              )}
             </div>
           </div>
         </div>

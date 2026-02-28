@@ -136,6 +136,20 @@ export interface ActivityQueryParams {
 
 // ── Agent action types ──
 
+export interface AgentRequestAuth {
+  readonly signature: string;
+  readonly publicKey: string;
+}
+
+export interface RegisterAgentRequest {
+  readonly publicKey: string;
+  readonly proof: string;
+  readonly address: string;
+  readonly ownerAddress: string;
+  readonly ownerPublicKey: string;
+  readonly ownerSignature: string;
+}
+
 export interface MintRequest {
   readonly address: string;
   readonly metadata: {
@@ -188,6 +202,11 @@ export interface DeployCollectionResponse {
   readonly contractAddress: string;
   readonly fundingTxHash: string;
   readonly deploymentTxHash: string;
+}
+
+export interface OwnedAgentsResponse {
+  readonly ownerAddress: string;
+  readonly agents: readonly string[];
 }
 
 export interface AgentActionResponse {

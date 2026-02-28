@@ -10,6 +10,7 @@ import type {
     DeployCollectionRequest,
 } from '../types/index.js';
 import { registerAgentOnChain } from '../agents/AgentRegistry.js';
+import { verifyAgentSignature } from '../agents/AgentAuthService.js';
 import { isValidAgentAddress, normalizeAgentAddress } from '../agents/AddressValidator.js';
 import {
     getMissingChainConfigKeys,
@@ -25,6 +26,10 @@ import { record } from '../store/ActivityStore.js';
 type AgentEnv = { Variables: { agentAddress: string; agentPublicKey: string } };
 
 export const agentRoutes = new Hono<AgentEnv>();
+
+function buildOwnerClaimMessage(agentAddress: string, ownerAddress: string): string {
+    return `I claim ownership of agent ${agentAddress} on EasyWeb3 as ${ownerAddress}`;
+}
 
 function requireChainReady(c: Context): Response | null {
     const missing = getMissingChainConfigKeys();
@@ -51,11 +56,32 @@ agentRoutes.post('/register', async (c) => {
     const readinessError = requireChainReady(c);
     if (readinessError) return readinessError;
 
-    const body = await c.req.json() as { publicKey?: string; proof?: string; address?: string };
+    const body = await c.req.json() as {
+        publicKey?: string;
+        proof?: string;
+        address?: string;
+        ownerAddress?: string;
+        ownerPublicKey?: string;
+        ownerSignature?: string;
+    };
     const verifiedPublicKey = (c.get('agentPublicKey') as string | undefined) ?? '';
+    const signedAgentAddress = (c.get('agentAddress') as string | undefined) ?? '';
 
-    if (!body.publicKey || !body.proof || !body.address) {
-        return c.json({ success: false, error: 'publicKey, proof, and address are required' }, 400);
+    if (
+        !body.publicKey
+        || !body.proof
+        || !body.address
+        || !body.ownerAddress
+        || !body.ownerPublicKey
+        || !body.ownerSignature
+    ) {
+        return c.json(
+            {
+                success: false,
+                error: 'publicKey, proof, address, ownerAddress, ownerPublicKey, and ownerSignature are required',
+            },
+            400,
+        );
     }
 
     const cleanBodyKey = body.publicKey.startsWith('0x') ? body.publicKey.slice(2).toLowerCase() : body.publicKey.toLowerCase();
@@ -69,8 +95,30 @@ agentRoutes.post('/register', async (c) => {
         return c.json({ success: false, error: 'Invalid address format (expected bech32 taproot address)' }, 400);
     }
 
+    if (signedAgentAddress && signedAgentAddress !== agentAddress) {
+        return c.json({ success: false, error: 'Signed agent address does not match request body address' }, 403);
+    }
+
+    const ownerAddress = normalizeAgentAddress(body.ownerAddress);
+    if (!isValidAgentAddress(ownerAddress)) {
+        return c.json({ success: false, error: 'Invalid ownerAddress format (expected bech32 taproot address)' }, 400);
+    }
+
+    const ownerClaimMessage = buildOwnerClaimMessage(agentAddress, ownerAddress);
+    const ownerVerification = await verifyAgentSignature(
+        ownerClaimMessage,
+        body.ownerSignature,
+        body.ownerPublicKey,
+    );
+    if (!ownerVerification.valid) {
+        return c.json(
+            { success: false, error: ownerVerification.error ?? 'Invalid owner signature' },
+            403,
+        );
+    }
+
     try {
-        const txHash = await registerAgentOnChain(agentAddress);
+        const txHash = await registerAgentOnChain(agentAddress, ownerAddress);
 
         const response: AgentActionResponse = { txHash };
         return c.json({ success: true, data: response });
