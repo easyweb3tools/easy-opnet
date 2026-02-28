@@ -1,1 +1,4 @@
 test-agent*
+deploy-contracts-refactor.md
+integrate-op-wallet.md
+backend/contracts/*.wasm

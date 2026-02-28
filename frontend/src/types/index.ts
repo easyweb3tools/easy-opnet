@@ -172,6 +172,24 @@ export interface CancelRequest {
   readonly listingId: string;
 }
 
+export interface DeployCollectionRequest {
+  readonly address: string;
+  readonly name: string;
+  readonly symbol: string;
+  readonly maxSupply: string;
+  readonly baseURI?: string;
+  readonly collectionBanner?: string;
+  readonly collectionIcon?: string;
+  readonly collectionWebsite?: string;
+  readonly collectionDescription?: string;
+}
+
+export interface DeployCollectionResponse {
+  readonly contractAddress: string;
+  readonly fundingTxHash: string;
+  readonly deploymentTxHash: string;
+}
+
 export interface AgentActionResponse {
   readonly txHash: string;
   readonly tokenId?: string;

@@ -14,6 +14,8 @@ import type {
   BidRequest,
   BuyRequest,
   CancelRequest,
+  DeployCollectionRequest,
+  DeployCollectionResponse,
 } from "@/types";
 
 export class ApiError extends Error {
@@ -149,4 +151,10 @@ export function buyNft(req: BuyRequest): Promise<AgentActionResponse> {
 
 export function cancelListing(req: CancelRequest): Promise<AgentActionResponse> {
   return agentRequest("/agent/cancel", req);
+}
+
+export function deployCollection(
+  req: DeployCollectionRequest,
+): Promise<DeployCollectionResponse> {
+  return agentRequest("/agent/deploy-collection", req);
 }

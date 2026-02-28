@@ -1,31 +1,49 @@
 /**
  * deploy-contracts.ts
  *
- * Deploys AgentVaultNFT and AgentVaultMarketplace contracts to OPNet testnet.
+ * Deploys MyNFT contract to OPNet.
+ * Uses parameterized deployment calldata matching MyNFT.onDeployment().
  *
  * Usage: tsx scripts/deploy-contracts.ts
- *
- * Requires WALLET_MNEMONIC env var with a funded testnet wallet.
  */
 
 import 'dotenv/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-
 import { networks } from '@btc-vision/bitcoin';
 import {
+    BinaryWriter,
     Mnemonic,
-    TransactionFactory,
     OPNetLimitedProvider,
+    TransactionFactory,
 } from '@btc-vision/transaction';
-import { getContract, JSONRpcProvider, type BitcoinInterfaceAbi, ABIDataTypes, BitcoinAbiTypes } from 'opnet';
+import { JSONRpcProvider } from 'opnet';
+
+type DeployNetwork = 'regtest' | 'testnet' | 'mainnet';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// CRITICAL: OPNet testnet = networks.opnetTestnet (Signet fork). NEVER networks.testnet.
-const network = networks.opnetTestnet;
-const RPC_URL = process.env.OPNET_RPC_URL_TESTNET ?? 'https://testnet.opnet.org';
+const NETWORK_NAME = (process.env.OPNET_NETWORK ?? 'testnet') as DeployNetwork;
+const NETWORK_MAP = {
+    regtest: networks.regtest,
+    testnet: networks.opnetTestnet,
+    mainnet: networks.bitcoin,
+} as const;
+
+const RPC_URL_MAP = {
+    regtest: process.env.OPNET_RPC_URL_REGTEST ?? 'https://regtest.opnet.org',
+    testnet: process.env.OPNET_RPC_URL_TESTNET ?? 'https://testnet.opnet.org',
+    mainnet: process.env.OPNET_RPC_URL_MAINNET ?? 'https://mainnet.opnet.org',
+} as const;
+
+if (!NETWORK_MAP[NETWORK_NAME]) {
+    console.error(`ERROR: Unsupported OPNET_NETWORK=${NETWORK_NAME}`);
+    process.exit(1);
+}
+
+const network = NETWORK_MAP[NETWORK_NAME];
+const RPC_URL = RPC_URL_MAP[NETWORK_NAME];
 
 const MNEMONIC = process.env.WALLET_MNEMONIC;
 if (!MNEMONIC) {
@@ -33,220 +51,145 @@ if (!MNEMONIC) {
     process.exit(1);
 }
 
-const NFT_WASM = path.resolve(__dirname, '../../contracts/build/AgentVaultNFT.wasm');
-const MARKETPLACE_WASM = path.resolve(__dirname, '../../contracts/build/AgentVaultMarketplace.wasm');
+const NFT_WASM = path.resolve(__dirname, '../contracts/MyNFT.wasm');
 const MIN_RECOMMENDED_BALANCE = 200_000n;
 
+const DEFAULT_COLLECTION = {
+    name: process.env.DEPLOY_COLLECTION_NAME ?? 'Easy Web3 Tools',
+    symbol: process.env.DEPLOY_COLLECTION_SYMBOL ?? 'EASY',
+    maxSupply: process.env.DEPLOY_COLLECTION_MAX_SUPPLY ?? '10000',
+    baseURI: process.env.DEPLOY_COLLECTION_BASE_URI ?? 'https://img.easyweb3.tools/easyweb3.jpg',
+    collectionBanner: process.env.DEPLOY_COLLECTION_BANNER ?? 'https://img.easyweb3.tools/easyweb3.jpg',
+    collectionIcon: process.env.DEPLOY_COLLECTION_ICON ?? 'https://img.easyweb3.tools/easyweb3.jpg',
+    collectionWebsite: process.env.DEPLOY_COLLECTION_WEBSITE ?? 'https://www.easyweb3.tools',
+    collectionDescription: process.env.DEPLOY_COLLECTION_DESCRIPTION ?? 'AI-Native NFT Marketplace on OPNet!',
+} as const;
+
+function buildDeploymentCalldata(maxSupply: bigint): Uint8Array {
+    const writer = new BinaryWriter();
+    writer.writeStringWithLength(DEFAULT_COLLECTION.name);
+    writer.writeStringWithLength(DEFAULT_COLLECTION.symbol);
+    writer.writeU256(maxSupply);
+    writer.writeStringWithLength(DEFAULT_COLLECTION.baseURI);
+    writer.writeStringWithLength(DEFAULT_COLLECTION.collectionBanner);
+    writer.writeStringWithLength(DEFAULT_COLLECTION.collectionIcon);
+    writer.writeStringWithLength(DEFAULT_COLLECTION.collectionWebsite);
+    writer.writeStringWithLength(DEFAULT_COLLECTION.collectionDescription);
+
+    return new Uint8Array(writer.getBuffer());
+}
+
+function parseMaxSupply(raw: string): bigint {
+    let maxSupply: bigint;
+    try {
+        maxSupply = BigInt(raw);
+    } catch {
+        throw new Error(`Invalid DEPLOY_COLLECTION_MAX_SUPPLY: "${raw}"`);
+    }
+
+    if (maxSupply <= 0n) {
+        throw new Error('DEPLOY_COLLECTION_MAX_SUPPLY must be greater than zero');
+    }
+
+    return maxSupply;
+}
+
 async function main(): Promise<void> {
-    // Validate WASM files exist
     if (!fs.existsSync(NFT_WASM)) {
-        console.error(`NFT WASM not found at ${NFT_WASM}`);
+        console.error(`MyNFT WASM not found at ${NFT_WASM}`);
+        console.error('Run: cd contracts && npm run build:nft:copy');
         process.exit(1);
     }
-    if (!fs.existsSync(MARKETPLACE_WASM)) {
-        console.error(`Marketplace WASM not found at ${MARKETPLACE_WASM}`);
-        process.exit(1);
-    }
+
+    const maxSupply = parseMaxSupply(DEFAULT_COLLECTION.maxSupply);
 
     console.log('Initializing wallet...');
     const mnemonic = new Mnemonic(MNEMONIC, '', network);
     const wallet = mnemonic.derive(0);
+    console.log(`Network: ${NETWORK_NAME}`);
+    console.log(`RPC URL: ${RPC_URL}`);
     console.log(`Wallet address: ${wallet.p2tr}`);
 
     const limitedProvider = new OPNetLimitedProvider(RPC_URL);
     const jsonRpcProvider = new JSONRpcProvider({ url: RPC_URL, network });
 
-    // Preflight: verify wallet has funds before attempting any deployment tx.
-    const currentBalance = await jsonRpcProvider.getBalance(wallet.p2tr, true);
-    console.log(`Wallet balance: ${currentBalance} sats`);
-    if (currentBalance < MIN_RECOMMENDED_BALANCE) {
-        throw new Error(
-            `Insufficient balance for deployment. Need at least ${MIN_RECOMMENDED_BALANCE} sats, got ${currentBalance}. Fund ${wallet.p2tr} and retry.`,
+    try {
+        const currentBalance = await jsonRpcProvider.getBalance(wallet.p2tr, true);
+        console.log(`Wallet balance: ${currentBalance} sats`);
+        if (currentBalance < MIN_RECOMMENDED_BALANCE) {
+            throw new Error(
+                `Insufficient balance for deployment. Need at least ${MIN_RECOMMENDED_BALANCE} sats, got ${currentBalance}. Fund ${wallet.p2tr} and retry.`,
+            );
+        }
+
+        const challenge = await jsonRpcProvider.getChallenge();
+        const bytecode = new Uint8Array(fs.readFileSync(NFT_WASM));
+        const calldata = buildDeploymentCalldata(maxSupply);
+
+        console.log('\n--- Deploying MyNFT ---');
+        console.log(`Bytecode size: ${bytecode.length} bytes`);
+        console.log(`Calldata size: ${calldata.length} bytes`);
+
+        const utxos = await limitedProvider.fetchUTXO({
+            address: wallet.p2tr,
+            minAmount: 10_000n,
+            requestedAmount: 500_000n,
+        });
+        if (utxos.length === 0) {
+            throw new Error(`No spendable UTXOs found for ${wallet.p2tr}. Fund wallet and retry.`);
+        }
+        console.log(`Found ${utxos.length} UTXOs for deployment`);
+
+        const factory = new TransactionFactory();
+        const deployResult = await factory.signDeployment({
+            signer: wallet.keypair,
+            mldsaSigner: wallet.mldsaKeypair,
+            network,
+            from: wallet.p2tr,
+            bytecode,
+            calldata,
+            utxos,
+            challenge,
+            feeRate: 2,
+            priorityFee: 330n,
+            gasSatFee: 330n,
+        });
+
+        if (!deployResult.transaction || deployResult.transaction.length < 2) {
+            throw new Error('Deployment signing returned incomplete transactions');
+        }
+
+        console.log(`Contract address: ${deployResult.contractAddress}`);
+
+        const fundingBroadcast = await limitedProvider.broadcastTransaction(
+            deployResult.transaction[0],
+            false,
         );
-    }
-
-    // Fetch challenge from the provider
-    const challenge = await jsonRpcProvider.getChallenge();
-
-    // --- Deploy NFT Contract ---
-    console.log('\n--- Deploying AgentVaultNFT ---');
-    const nftBytecode = new Uint8Array(fs.readFileSync(NFT_WASM));
-    console.log(`NFT bytecode size: ${nftBytecode.length} bytes`);
-
-    const nftUtxos = await limitedProvider.fetchUTXO({
-        address: wallet.p2tr,
-        minAmount: 10_000n,
-        requestedAmount: 500_000n,
-    });
-    if (nftUtxos.length === 0) {
-        throw new Error(`No spendable UTXOs found for ${wallet.p2tr}. Fund wallet and retry.`);
-    }
-    console.log(`Found ${nftUtxos.length} UTXOs for NFT deployment`);
-
-    const factory = new TransactionFactory();
-
-    const nftResult = await factory.signDeployment({
-        signer: wallet.keypair,
-        mldsaSigner: wallet.mldsaKeypair,
-        network,
-        from: wallet.p2tr,
-        bytecode: nftBytecode,
-        utxos: nftUtxos,
-        challenge,
-        feeRate: 2,
-        priorityFee: 330n,
-        gasSatFee: 330n,
-    });
-
-    console.log(`NFT Contract address: ${nftResult.contractAddress}`);
-
-    // Broadcast funding TX, then deployment TX
-    const nftFundBroadcast = await limitedProvider.broadcastTransaction(nftResult.transaction[0], false);
-    if (!nftFundBroadcast?.success) {
-        throw new Error('Failed to broadcast NFT funding transaction');
-    }
-    console.log(`NFT funding TX broadcast: ${nftFundBroadcast?.success ? 'OK' : 'FAILED'}`);
-
-    const nftDeployBroadcast = await limitedProvider.broadcastTransaction(nftResult.transaction[1], false);
-    if (!nftDeployBroadcast?.success) {
-        throw new Error('Failed to broadcast NFT deployment transaction');
-    }
-    console.log(`NFT deployment TX broadcast: ${nftDeployBroadcast?.success ? 'OK' : 'FAILED'}`);
-
-    // Wait for confirmation
-    console.log('Waiting 10s for NFT contract confirmation...');
-    await sleep(10_000);
-
-    // --- Deploy Marketplace Contract ---
-    console.log('\n--- Deploying AgentVaultMarketplace ---');
-    const marketBytecode = new Uint8Array(fs.readFileSync(MARKETPLACE_WASM));
-    console.log(`Marketplace bytecode size: ${marketBytecode.length} bytes`);
-
-    // Refresh challenge
-    const challenge2 = await jsonRpcProvider.getChallenge();
-
-    const marketUtxos = await limitedProvider.fetchUTXO({
-        address: wallet.p2tr,
-        minAmount: 10_000n,
-        requestedAmount: 500_000n,
-    });
-    if (marketUtxos.length === 0) {
-        throw new Error(`No spendable UTXOs found for ${wallet.p2tr} before marketplace deployment.`);
-    }
-    console.log(`Found ${marketUtxos.length} UTXOs for Marketplace deployment`);
-
-    const marketResult = await factory.signDeployment({
-        signer: wallet.keypair,
-        mldsaSigner: wallet.mldsaKeypair,
-        network,
-        from: wallet.p2tr,
-        bytecode: marketBytecode,
-        utxos: marketUtxos,
-        challenge: challenge2,
-        feeRate: 2,
-        priorityFee: 330n,
-        gasSatFee: 330n,
-    });
-
-    console.log(`Marketplace Contract address: ${marketResult.contractAddress}`);
-
-    const mktFundBroadcast = await limitedProvider.broadcastTransaction(marketResult.transaction[0], false);
-    if (!mktFundBroadcast?.success) {
-        throw new Error('Failed to broadcast marketplace funding transaction');
-    }
-    console.log(`Marketplace funding TX broadcast: ${mktFundBroadcast?.success ? 'OK' : 'FAILED'}`);
-
-    const mktDeployBroadcast = await limitedProvider.broadcastTransaction(marketResult.transaction[1], false);
-    if (!mktDeployBroadcast?.success) {
-        throw new Error('Failed to broadcast marketplace deployment transaction');
-    }
-    console.log(`Marketplace deployment TX broadcast: ${mktDeployBroadcast?.success ? 'OK' : 'FAILED'}`);
-
-    console.log('Waiting 10s for Marketplace contract confirmation...');
-    await sleep(10_000);
-
-    // --- Post-deployment setup ---
-    console.log('\n--- Post-deployment setup ---');
-    const nftAddress = nftResult.contractAddress;
-    const marketAddress = marketResult.contractAddress;
-
-    const F = BitcoinAbiTypes.Function;
-    const MARKETPLACE_ABI: BitcoinInterfaceAbi = [
-        { name: 'setNftContract', type: F, inputs: [{ name: 'nftContract', type: ABIDataTypes.ADDRESS }], outputs: [] },
-    ];
-
-    const NFT_ABI: BitcoinInterfaceAbi = [
-        { name: 'registerAgent', type: F, inputs: [{ name: 'agent', type: ABIDataTypes.ADDRESS }], outputs: [] },
-    ];
-
-    // Call marketplace.setNftContract(nftAddress)
-    console.log('Setting NFT contract on marketplace...');
-    const marketContract = getContract(
-        marketAddress,
-        MARKETPLACE_ABI,
-        jsonRpcProvider,
-        network,
-        wallet.p2tr as unknown as Parameters<typeof getContract>[4],
-    );
-
-    const setNftFn = (marketContract as unknown as Record<string, (...args: unknown[]) => Promise<Record<string, unknown>>>).setNftContract;
-    if (setNftFn) {
-        const sim = await setNftFn(nftAddress);
-        const sendFn = (sim as Record<string, CallableFunction>).sendTransaction;
-        if (typeof sendFn === 'function') {
-            const receipt = await sendFn({
-                signer: wallet.keypair,
-                mldsaSigner: wallet.mldsaKeypair,
-                refundTo: wallet.p2tr,
-                maximumAllowedSatToSpend: 50000n,
-                network,
-            });
-            console.log(`setNftContract TX: ${(receipt as { transactionId: string }).transactionId}`);
+        if (!fundingBroadcast?.success) {
+            throw new Error('Failed to broadcast deployment funding transaction');
         }
-    }
+        console.log(`Funding TX hash: ${fundingBroadcast.result ?? '(missing hash)'}`);
 
-    // Call nft.registerAgent(walletAddress)
-    console.log('Registering wallet as agent...');
-    const nftContract = getContract(
-        nftAddress,
-        NFT_ABI,
-        jsonRpcProvider,
-        network,
-        wallet.p2tr as unknown as Parameters<typeof getContract>[4],
-    );
-
-    const registerFn = (nftContract as unknown as Record<string, (...args: unknown[]) => Promise<Record<string, unknown>>>).registerAgent;
-    if (registerFn) {
-        const sim = await registerFn(wallet.p2tr);
-        const sendFn = (sim as Record<string, CallableFunction>).sendTransaction;
-        if (typeof sendFn === 'function') {
-            const receipt = await sendFn({
-                signer: wallet.keypair,
-                mldsaSigner: wallet.mldsaKeypair,
-                refundTo: wallet.p2tr,
-                maximumAllowedSatToSpend: 50000n,
-                network,
-            });
-            console.log(`registerAgent TX: ${(receipt as { transactionId: string }).transactionId}`);
+        const deploymentBroadcast = await limitedProvider.broadcastTransaction(
+            deployResult.transaction[1],
+            false,
+        );
+        if (!deploymentBroadcast?.success) {
+            throw new Error('Failed to broadcast deployment transaction');
         }
+        console.log(`Deployment TX hash: ${deploymentBroadcast.result ?? '(missing hash)'}`);
+
+        console.log('\n========================================');
+        console.log('  Deployment Complete');
+        console.log('========================================');
+        console.log(`NFT_CONTRACT_ADDRESS=${deployResult.contractAddress}`);
+        console.log('\nAdd this to backend env/secrets.');
+        console.log('========================================');
+    } finally {
+        if (typeof mnemonic.zeroize === 'function') mnemonic.zeroize();
+        if (typeof wallet.zeroize === 'function') wallet.zeroize();
+        await jsonRpcProvider.close();
     }
-
-    // Clean up
-    if (typeof mnemonic.zeroize === 'function') mnemonic.zeroize();
-    if (typeof wallet.zeroize === 'function') wallet.zeroize();
-    await jsonRpcProvider.close();
-
-    console.log('\n========================================');
-    console.log('  Deployment Complete!');
-    console.log('========================================');
-    console.log(`  NFT_CONTRACT_ADDRESS=${nftAddress}`);
-    console.log(`  MARKETPLACE_CONTRACT_ADDRESS=${marketAddress}`);
-    console.log('\nAdd these to your backend/.env file.');
-    console.log('========================================');
-}
-
-function sleep(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
 }
 
 main().catch((err) => {

@@ -1,10 +1,23 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import type { AgentActionResponse, MintRequest, ListRequest, BidRequest, BuyRequest, CancelRequest } from '../types/index.js';
+import type {
+    AgentActionResponse,
+    MintRequest,
+    ListRequest,
+    BidRequest,
+    BuyRequest,
+    CancelRequest,
+    DeployCollectionRequest,
+} from '../types/index.js';
 import { registerAgentOnChain } from '../agents/AgentRegistry.js';
 import { isValidAgentAddress, normalizeAgentAddress } from '../agents/AddressValidator.js';
-import { getMissingChainConfigKeys, readinessErrorMessage } from '../config/readiness.js';
+import {
+    getMissingChainConfigKeys,
+    getMissingWalletConfigKeys,
+    readinessErrorMessage,
+} from '../config/readiness.js';
 import { mintNFT } from '../nft/MintService.js';
+import { deployCollection } from '../nft/DeployService.js';
 import { listNFT, buyNow, placeBid, cancelListing } from '../market/MarketService.js';
 import { getListingState } from '../market/EscrowManager.js';
 import { record } from '../store/ActivityStore.js';
@@ -15,6 +28,16 @@ export const agentRoutes = new Hono<AgentEnv>();
 
 function requireChainReady(c: Context): Response | null {
     const missing = getMissingChainConfigKeys();
+    if (missing.length === 0) return null;
+
+    return c.json(
+        { success: false, error: readinessErrorMessage(missing) },
+        503,
+    );
+}
+
+function requireWalletReady(c: Context): Response | null {
+    const missing = getMissingWalletConfigKeys();
     if (missing.length === 0) return null;
 
     return c.json(
@@ -53,6 +76,66 @@ agentRoutes.post('/register', async (c) => {
         return c.json({ success: true, data: response });
     } catch (err) {
         const msg = err instanceof Error ? err.message : 'Registration failed';
+        return c.json({ success: false, error: msg }, 500);
+    }
+});
+
+// POST /api/agent/deploy-collection
+agentRoutes.post('/deploy-collection', async (c) => {
+    const readinessError = requireWalletReady(c);
+    if (readinessError) return readinessError;
+
+    const body = await c.req.json() as DeployCollectionRequest;
+    const agentAddress = c.get('agentAddress');
+
+    if (!body.address || !body.name || !body.symbol || !body.maxSupply) {
+        return c.json(
+            { success: false, error: 'address, name, symbol, and maxSupply are required' },
+            400,
+        );
+    }
+
+    const name = body.name.trim();
+    const symbol = body.symbol.trim();
+    if (!name || !symbol) {
+        return c.json({ success: false, error: 'name and symbol cannot be empty' }, 400);
+    }
+
+    let maxSupply: bigint;
+    try {
+        maxSupply = BigInt(body.maxSupply);
+    } catch {
+        return c.json({ success: false, error: 'maxSupply must be a valid integer string' }, 400);
+    }
+
+    if (maxSupply <= 0n) {
+        return c.json({ success: false, error: 'maxSupply must be greater than zero' }, 400);
+    }
+
+    try {
+        const result = await deployCollection({
+            address: body.address,
+            name,
+            symbol,
+            maxSupply: body.maxSupply,
+            baseURI: body.baseURI ?? '',
+            collectionBanner: body.collectionBanner ?? '',
+            collectionIcon: body.collectionIcon ?? '',
+            collectionWebsite: body.collectionWebsite ?? '',
+            collectionDescription: body.collectionDescription ?? '',
+        });
+
+        record({
+            type: 'mint',
+            agent: agentAddress,
+            tokenId: '',
+            nftName: name,
+            txHash: result.deploymentTxHash,
+        });
+
+        return c.json({ success: true, data: result });
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Deployment failed';
         return c.json({ success: false, error: msg }, 500);
     }
 });

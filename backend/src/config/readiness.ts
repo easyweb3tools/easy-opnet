@@ -33,6 +33,16 @@ export function getMissingNftConfigKeys(): string[] {
     return missing;
 }
 
+export function getMissingWalletConfigKeys(): string[] {
+    const missing: string[] = [];
+
+    if (!hasValue(env.walletMnemonic)) {
+        missing.push('WALLET_MNEMONIC');
+    }
+
+    return missing;
+}
+
 export function readinessErrorMessage(missingKeys: readonly string[]): string {
     return `Backend not configured for on-chain operations. Missing: ${missingKeys.join(', ')}. Deploy contracts (npm run deploy:contracts), then set missing env vars and restart backend.`;
 }

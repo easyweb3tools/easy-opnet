@@ -90,28 +90,19 @@ export class MyNFT extends OP721 {
         return this._blocksWithReservations as StoredU64Array;
     }
 
-    public override onDeployment(_calldata: Calldata): void {
-        const maxSupply: u256 = u256.fromU32(10000);
+    public override onDeployment(calldata: Calldata): void {
+        const name: string = calldata.readStringWithLength();
+        const symbol: string = calldata.readStringWithLength();
+        const maxSupply: u256 = calldata.readU256();
+        const baseURI: string = calldata.readStringWithLength();
+        const collectionBanner: string = calldata.readStringWithLength();
+        const collectionIcon: string = calldata.readStringWithLength();
+        const collectionWebsite: string = calldata.readStringWithLength();
+        const collectionDescription: string = calldata.readStringWithLength();
 
-        // Validate max supply against current state
-        if (this._totalSupply.value >= maxSupply) {
-            throw new Revert('Max supply already reached');
+        if (maxSupply.isZero()) {
+            throw new Revert('maxSupply must be > 0');
         }
-
-        const name: string = 'Easy Web3 Tools';
-        const symbol: string = 'easy';
-
-        const baseURI: string = 'https://img.easyweb3.tools/easyweb3.jpg';
-
-        // Should be 1500x500-1500x300
-        const collectionBanner: string =
-            'https://img.easyweb3.tools/easyweb3.jpg';
-
-        const collectionIcon: string =
-            'https://img.easyweb3.tools/easyweb3.jpg';
-
-        const collectionWebsite: string = 'https://www.easyweb3.tools';
-        const collectionDescription: string = 'AI-Native NFT Marketplace on OPNet! 😎';
 
         this.instantiate(
             new OP721InitParameters(
