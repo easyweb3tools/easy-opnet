@@ -23,13 +23,42 @@ cd "$PROJECT_DIR"
 
 ACTION="${1:-deploy}"
 
+load_dotenv_file() {
+    local dotenv_path="$1"
+    [ -f "$dotenv_path" ] || return 0
+
+    while IFS= read -r raw_line || [ -n "$raw_line" ]; do
+        local line="${raw_line%$'\r'}"
+        # Skip comments / empty lines
+        case "$line" in
+            ''|'#'*) continue ;;
+        esac
+
+        # Keep only KEY=VALUE entries
+        if [[ "$line" != *=* ]]; then
+            continue
+        fi
+
+        local key="${line%%=*}"
+        local value="${line#*=}"
+
+        # Trim spaces around key
+        key="${key#"${key%%[![:space:]]*}"}"
+        key="${key%"${key##*[![:space:]]}"}"
+
+        # Remove optional surrounding quotes from value
+        if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+            value="${value:1:${#value}-2}"
+        elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+            value="${value:1:${#value}-2}"
+        fi
+
+        export "$key=$value"
+    done < "$dotenv_path"
+}
+
 # ── Load .env if present ──
-if [ -f .env ]; then
-    set -a
-    # shellcheck disable=SC1091
-    source .env
-    set +a
-fi
+load_dotenv_file .env
 
 # ── Resolve D1_DATABASE_ID ──
 if [ -z "${D1_DATABASE_ID:-}" ]; then
