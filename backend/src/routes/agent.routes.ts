@@ -1,7 +1,9 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AgentActionResponse, MintRequest, ListRequest, BidRequest, BuyRequest, CancelRequest } from '../types/index.js';
 import { registerAgentOnChain } from '../agents/AgentRegistry.js';
 import { isValidAgentAddress, normalizeAgentAddress } from '../agents/AddressValidator.js';
+import { getMissingChainConfigKeys, readinessErrorMessage } from '../config/readiness.js';
 import { mintNFT } from '../nft/MintService.js';
 import { listNFT, buyNow, placeBid, cancelListing } from '../market/MarketService.js';
 import { getListingState } from '../market/EscrowManager.js';
@@ -11,8 +13,21 @@ type AgentEnv = { Variables: { agentAddress: string; agentPublicKey: string } };
 
 export const agentRoutes = new Hono<AgentEnv>();
 
+function requireChainReady(c: Context): Response | null {
+    const missing = getMissingChainConfigKeys();
+    if (missing.length === 0) return null;
+
+    return c.json(
+        { success: false, error: readinessErrorMessage(missing) },
+        503,
+    );
+}
+
 // POST /api/agent/register
 agentRoutes.post('/register', async (c) => {
+    const readinessError = requireChainReady(c);
+    if (readinessError) return readinessError;
+
     const body = await c.req.json() as { publicKey?: string; proof?: string; address?: string };
     const verifiedPublicKey = (c.get('agentPublicKey') as string | undefined) ?? '';
 
@@ -44,6 +59,9 @@ agentRoutes.post('/register', async (c) => {
 
 // POST /api/agent/mint
 agentRoutes.post('/mint', async (c) => {
+    const readinessError = requireChainReady(c);
+    if (readinessError) return readinessError;
+
     const body = await c.req.json() as MintRequest;
     const agentAddress = c.get('agentAddress');
 
@@ -101,6 +119,9 @@ agentRoutes.post('/mint', async (c) => {
 
 // POST /api/agent/list
 agentRoutes.post('/list', async (c) => {
+    const readinessError = requireChainReady(c);
+    if (readinessError) return readinessError;
+
     const body = await c.req.json() as ListRequest;
     const agentAddress = c.get('agentAddress');
 
@@ -138,6 +159,9 @@ agentRoutes.post('/list', async (c) => {
 
 // POST /api/agent/bid
 agentRoutes.post('/bid', async (c) => {
+    const readinessError = requireChainReady(c);
+    if (readinessError) return readinessError;
+
     const body = await c.req.json() as BidRequest;
     const agentAddress = c.get('agentAddress');
 
@@ -170,6 +194,9 @@ agentRoutes.post('/bid', async (c) => {
 
 // POST /api/agent/buy
 agentRoutes.post('/buy', async (c) => {
+    const readinessError = requireChainReady(c);
+    if (readinessError) return readinessError;
+
     const body = await c.req.json() as BuyRequest;
     const agentAddress = c.get('agentAddress');
 
@@ -211,6 +238,9 @@ agentRoutes.post('/buy', async (c) => {
 
 // POST /api/agent/cancel
 agentRoutes.post('/cancel', async (c) => {
+    const readinessError = requireChainReady(c);
+    if (readinessError) return readinessError;
+
     const body = await c.req.json() as CancelRequest;
     const agentAddress = c.get('agentAddress');
 

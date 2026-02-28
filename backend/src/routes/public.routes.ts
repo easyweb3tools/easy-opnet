@@ -10,6 +10,7 @@ import type {
 import { computeStats } from '../store/StatsAggregator.js';
 import { query as queryActivity, getEventsByAgent } from '../store/ActivityStore.js';
 import { getDevSeedListings, findDevSeedListing } from '../store/DevSeedListings.js';
+import { getMissingChainConfigKeys, getMissingNftConfigKeys, readinessErrorMessage } from '../config/readiness.js';
 import { getListingState, getListingCount } from '../market/EscrowManager.js';
 import { getTokenOwner, getTokenURI, getBalanceOf } from '../nft/TokenIndexer.js';
 import { isRegisteredAgent } from '../agents/AgentRegistry.js';
@@ -260,6 +261,10 @@ publicRoutes.get('/listing/:id', async (c) => {
 // GET /api/public/nft/:tokenId
 publicRoutes.get('/nft/:tokenId', async (c) => {
     const tokenId = c.req.param('tokenId');
+    const missing = getMissingNftConfigKeys();
+    if (missing.length > 0) {
+        return c.json({ success: false, error: readinessErrorMessage(missing) }, 503);
+    }
 
     try {
         const [owner, tokenUri] = await Promise.all([
@@ -294,6 +299,10 @@ publicRoutes.get('/nft/:tokenId', async (c) => {
 // GET /api/public/agent/:address
 publicRoutes.get('/agent/:address', async (c) => {
     const address = c.req.param('address');
+    const missing = getMissingChainConfigKeys();
+    if (missing.length > 0) {
+        return c.json({ success: false, error: readinessErrorMessage(missing) }, 503);
+    }
 
     try {
         const [registered, balance] = await Promise.all([
