@@ -1,0 +1,29 @@
+import { NextResponse, type NextRequest } from "next/server";
+
+export async function POST(request: NextRequest) {
+  const signature = request.headers.get("X-Agent-Signature");
+  const publicKey = request.headers.get("X-Agent-PublicKey");
+
+  if (!signature || !publicKey) {
+    return NextResponse.json(
+      { success: false, error: "Missing agent authentication headers" },
+      { status: 401 },
+    );
+  }
+
+  const body = (await request.json()) as { publicKey?: string; proof?: string };
+
+  if (!body.publicKey || !body.proof) {
+    return NextResponse.json(
+      { success: false, error: "publicKey and proof are required" },
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      txHash: `0xmock_register_${Date.now().toString(16)}`,
+    },
+  });
+}

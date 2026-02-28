@@ -1,0 +1,19 @@
+{
+  "name": "agentvault-contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:nft": "asc src/index.ts --config asconfig.json --target debug",
+    "build:market": "asc src/index.market.ts --config asconfig.market.json --target debug",
+    "build": "npm run build:nft && npm run build:market"
+  },
+  "dependencies": {
+    "@btc-vision/as-bignum": "0.1.2",
+    "@btc-vision/btc-runtime": "rc"
+  },
+  "devDependencies": {
+    "@btc-vision/assemblyscript": "^0.29.2",
+    "@btc-vision/opnet-transform": "1.1.0"
+  }
+}

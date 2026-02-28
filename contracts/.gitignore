@@ -1,0 +1,9 @@
+node_modules/
+build/
+abis/
+dist/
+.env
+.env.local
+*.wasm
+*.wat
+*.map
