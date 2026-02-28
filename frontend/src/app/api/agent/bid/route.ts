@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { proxyApiRequest } from "@/lib/backend-proxy";
 
 export async function POST(request: NextRequest) {
+  const proxied = await proxyApiRequest(request, "/api/agent/bid");
+  if (proxied) return proxied;
+
   const signature = request.headers.get("X-Agent-Signature");
   const publicKey = request.headers.get("X-Agent-PublicKey");
 

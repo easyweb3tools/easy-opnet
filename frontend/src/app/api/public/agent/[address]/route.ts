@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { findAgent, getAgentNfts, getAgentListings, getAgentActivity } from "@/lib/mock-data";
+import { proxyApiRequest } from "@/lib/backend-proxy";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ address: string }> },
 ) {
   const { address } = await params;
-  const agent = findAgent(decodeURIComponent(address));
+  const decodedAddress = decodeURIComponent(address);
+  const proxied = await proxyApiRequest(
+    request,
+    `/api/public/agent/${encodeURIComponent(decodedAddress)}`,
+  );
+  if (proxied) return proxied;
+
+  const agent = findAgent(decodedAddress);
 
   if (!agent) {
     return NextResponse.json(

@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { findNft } from "@/lib/mock-data";
+import { proxyApiRequest } from "@/lib/backend-proxy";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ tokenId: string }> },
 ) {
   const { tokenId } = await params;
+  const proxied = await proxyApiRequest(
+    request,
+    `/api/public/nft/${encodeURIComponent(tokenId)}`,
+  );
+  if (proxied) return proxied;
+
   const nft = findNft(tokenId);
 
   if (!nft) {

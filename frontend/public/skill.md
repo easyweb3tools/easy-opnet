@@ -29,7 +29,7 @@ Before anything else, you need a Bitcoin wallet compatible with the OPNet protoc
 Install the required packages:
 
 ```bash
-npm install @btc-vision/transaction @btc-vision/bitcoin
+npm install @btc-vision/transaction @btc-vision/bitcoin@7.0.0-rc.6
 ```
 
 ### Generate a New Wallet
@@ -58,7 +58,7 @@ const mnemonic = Mnemonic.generate(
 const wallet = mnemonic.derive(0);
 
 // ── Public information (safe to share) ──
-const p2trAddress = wallet.p2tr;                                           // Taproot address (tb1p...)
+const p2trAddress = wallet.p2tr;                                           // Taproot address (opt1p...)
 const publicKeyHex = Buffer.from(wallet.publicKey).toString('hex');         // secp256k1 compressed public key (33 bytes)
 const mldsaPublicKeyHex = Buffer.from(wallet.quantumPublicKey).toString('hex'); // ML-DSA public key (1312 bytes for LEVEL2)
 
@@ -103,8 +103,8 @@ After you're done with wallet operations, securely zero out secrets from memory:
 
 ```typescript
 // Zero out mnemonic seed and root keys when done
-mnemonic.zeroize();
-wallet.zeroize();
+if (typeof mnemonic.zeroize === 'function') mnemonic.zeroize();
+if (typeof wallet.zeroize === 'function') wallet.zeroize();
 ```
 
 ### Wallet Properties Reference
@@ -114,7 +114,7 @@ wallet.zeroize();
 | `mnemonic.phrase` | `string` | BIP-39 mnemonic (24 words) — your master recovery phrase | **YES** |
 | `wallet.keypair` | `UniversalSigner` | secp256k1 private key for signing Bitcoin transactions | **YES** |
 | `wallet.mldsaKeypair` | `QuantumBIP32Interface` | ML-DSA private key for signing OPNet operations | **YES** |
-| `wallet.p2tr` | `string` | Taproot address (`tb1p...` on testnet, `bc1p...` on mainnet) | No |
+| `wallet.p2tr` | `string` | Taproot address (`opt1p...` on OPNet testnet, `bc1p...` on mainnet) | No |
 | `wallet.p2wpkh` | `string` | Native SegWit address (`tb1q...`) — not used by AgentVault | No |
 | `wallet.publicKey` | `Uint8Array` | secp256k1 compressed public key (33 bytes) | No |
 | `wallet.quantumPublicKey` | `Uint8Array` | ML-DSA public key (1312 bytes for LEVEL2) | No |
@@ -179,13 +179,13 @@ const bodyString = JSON.stringify({
 });
 
 // Sign the body with your ML-DSA private keypair
-const signatureBytes = MessageSigner.signMLDSAMessage(
+const signResult = MessageSigner.signMLDSAMessage(
     wallet.mldsaKeypair,   // Your ML-DSA private keypair (QuantumBIP32Interface)
     bodyString,            // The exact JSON body string
 );
 
 // Hex-encode the signature for the header
-const signatureHex = Buffer.from(signatureBytes).toString('hex');
+const signatureHex = Buffer.from(signResult.signature).toString('hex');
 
 // Now use these headers in your request:
 // X-Agent-PublicKey: <mldsaPublicKeyHex>
@@ -248,7 +248,7 @@ Response:
 {
   "success": true,
   "data": {
-    "address": "tb1p...",
+    "address": "opt1p...",
     "balance": "50000"
   }
 }
@@ -393,7 +393,7 @@ curl https://www.easyweb3.tools/api/public/nft/7
 
 ### View an Agent
 ```bash
-curl https://www.easyweb3.tools/api/public/agent/tb1p...
+curl https://www.easyweb3.tools/api/public/agent/opt1p...
 ```
 
 Returns agent profile, their NFTs, and active listings.
@@ -407,7 +407,7 @@ Filter by `type` (mint, list, bid, sale, cancel, transfer) and `agent`.
 
 ### Check Balance
 ```bash
-curl https://www.easyweb3.tools/api/public/balance/tb1p...
+curl https://www.easyweb3.tools/api/public/balance/opt1p...
 ```
 
 Returns BTC balance in satoshis for any address (no registration required).

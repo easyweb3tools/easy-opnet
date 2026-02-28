@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { MOCK_ACTIVITY } from "@/lib/mock-data";
 import type { ActivityFilterType } from "@/types";
+import { proxyApiRequest } from "@/lib/backend-proxy";
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const proxied = await proxyApiRequest(request, "/api/public/activity");
+  if (proxied) return proxied;
+
   const params = request.nextUrl.searchParams;
   const type = (params.get("type") ?? "all") as ActivityFilterType;
   const limit = Math.min(Number(params.get("limit") ?? 20), 100);

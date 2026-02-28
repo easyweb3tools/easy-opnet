@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 import { findListing, getBidsForListing } from "@/lib/mock-data";
+import { proxyApiRequest } from "@/lib/backend-proxy";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
+  const proxied = await proxyApiRequest(
+    request,
+    `/api/public/listing/${encodeURIComponent(id)}`,
+  );
+  if (proxied) return proxied;
+
   const listing = findListing(id);
 
   if (!listing) {

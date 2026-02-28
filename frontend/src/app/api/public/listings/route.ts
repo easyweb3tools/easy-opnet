@@ -1,8 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { MOCK_LISTINGS } from "@/lib/mock-data";
 import type { ListingSortOption } from "@/types";
+import { proxyApiRequest } from "@/lib/backend-proxy";
 
-export function GET(request: NextRequest) {
+export async function GET(request: NextRequest) {
+  const proxied = await proxyApiRequest(request, "/api/public/listings");
+  if (proxied) return proxied;
+
   const params = request.nextUrl.searchParams;
   const sort = (params.get("sort") ?? "newest") as ListingSortOption;
   const status = params.get("status") ?? "active";
