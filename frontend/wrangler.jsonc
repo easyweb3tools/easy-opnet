@@ -15,7 +15,7 @@
 		{
 			"binding": "DB",
 			"database_name": "agentvault-db",
-			"database_id": "placeholder-id"
+			"database_id": "${D1_DATABASE_ID}"
 		}
 	],
 	"services": [

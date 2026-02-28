@@ -1,0 +1,30 @@
+name = "agentvault-backend"
+main = "src/worker.ts"
+compatibility_date = "2026-02-28"
+compatibility_flags = ["nodejs_compat"]
+
+# ── Environment Variables ──
+# Set these via `wrangler secret put <KEY>` for sensitive values.
+# Non-sensitive defaults can go in [vars].
+[vars]
+OPNET_NETWORK = "regtest"
+OPNET_RPC_URL_REGTEST = "https://regtest.opnet.org"
+OPNET_RPC_URL_TESTNET = "https://testnet.opnet.org"
+OPNET_RPC_URL_MAINNET = "https://mainnet.opnet.org"
+PORT = "3001"
+
+# ── Build ──
+[build]
+command = "npm run build"
+
+# ── Staging environment (optional) ──
+# [env.staging]
+# name = "agentvault-backend-staging"
+# [env.staging.vars]
+# OPNET_NETWORK = "testnet"
+
+# ── Production environment (optional) ──
+# [env.production]
+# name = "agentvault-backend-prod"
+# [env.production.vars]
+# OPNET_NETWORK = "mainnet"
