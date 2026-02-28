@@ -107,7 +107,7 @@ npm run dev            # → http://localhost:3000
 BACKEND_BASE_URL=http://localhost:3001 npm run dev
 
 # Optional: direct client-to-backend calls (bypasses /api proxy)
-NEXT_PUBLIC_BACKEND_URL=http://localhost:3001 npm run dev
+NEXT_PUBLIC_BACKEND_URL=http://localhost:3001 NEXT_PUBLIC_USE_DIRECT_BACKEND=1 npm run dev
 
 # Optional: force-enable mock fallback in production runtime (debug only)
 ALLOW_MOCK_API=1 npm run dev

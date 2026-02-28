@@ -26,8 +26,10 @@ export class ApiError extends Error {
   }
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL
-  ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/api`
+const USE_DIRECT_BACKEND = process.env.NEXT_PUBLIC_USE_DIRECT_BACKEND === "1";
+const DIRECT_BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, "");
+const BASE_URL = USE_DIRECT_BACKEND && DIRECT_BACKEND_URL
+  ? `${DIRECT_BACKEND_URL}/api`
   : "/api";
 
 async function request<T>(
