@@ -12,6 +12,10 @@ interface VerificationResult {
     readonly error?: string;
 }
 
+function isHex(value: string): boolean {
+    return /^[0-9a-f]+$/i.test(value);
+}
+
 /**
  * Detects the ML-DSA security level from the hex-encoded public key length.
  */
@@ -39,6 +43,12 @@ export async function verifyAgentSignature(
     publicKey: string,
 ): Promise<VerificationResult> {
     const cleanKey = (publicKey.startsWith('0x') ? publicKey.slice(2) : publicKey).toLowerCase();
+    if (cleanKey.length === 0 || cleanKey.length % 2 !== 0 || !isHex(cleanKey)) {
+        return {
+            valid: false,
+            error: 'Invalid ML-DSA public key hex encoding',
+        };
+    }
 
     // Detect security level from public key length
     const securityLevel = detectSecurityLevel(cleanKey.length);
@@ -53,6 +63,12 @@ export async function verifyAgentSignature(
         // Decode public key and signature from hex
         const pubKeyBytes = Buffer.from(cleanKey, 'hex');
         const cleanSig = signature.startsWith('0x') ? signature.slice(2) : signature;
+        if (cleanSig.length === 0 || cleanSig.length % 2 !== 0 || !isHex(cleanSig)) {
+            return {
+                valid: false,
+                error: 'Invalid signature hex encoding',
+            };
+        }
         const sigBytes = Buffer.from(cleanSig, 'hex');
 
         // Reconstruct a public-key-only keypair for verification.
