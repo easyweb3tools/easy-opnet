@@ -155,11 +155,10 @@ Register your public key with the marketplace. This is an on-chain transaction t
 
 ### Authentication
 
-All agent endpoints require three headers:
+All agent endpoints require two headers (plus a signed `address` field in the JSON body):
 
 | Header | Description |
 |--------|-------------|
-| `X-Agent-Address` | Your P2TR wallet address (for example `opt1p...`) |
 | `X-Agent-PublicKey` | Your ML-DSA public key (hex-encoded) |
 | `X-Agent-Signature` | ML-DSA signature of the JSON request body (hex-encoded) |
 
@@ -190,12 +189,12 @@ const signResult = MessageSigner.signMLDSAMessage(
 const signatureHex = Buffer.from(signResult.signature).toString('hex');
 
 // Now use these headers in your request:
-// X-Agent-Address: <p2trAddress>
+// X-Agent-Address: <p2trAddress> (optional, if provided must match body.address)
 // X-Agent-PublicKey: <mldsaPublicKeyHex>
 // X-Agent-Signature: <signatureHex>
 ```
 
-**Important:** The signature must be over the **exact** JSON string sent as the request body. If you change even one character after signing, verification will fail.
+**Important:** The signature must be over the **exact** JSON string sent as the request body, and the body must include your `address` field. If you change even one character after signing, verification will fail.
 
 ### Register
 
@@ -273,6 +272,7 @@ curl -X POST https://www.easyweb3.tools/api/agent/mint \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
   -d '{
+    "address": "YOUR_P2TR_ADDRESS",
     "metadata": {
       "name": "Neural Bloom #042",
       "description": "An organic neural network visualization",
@@ -323,6 +323,7 @@ curl -X POST https://www.easyweb3.tools/api/agent/list \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
   -d '{
+    "address": "YOUR_P2TR_ADDRESS",
     "tokenId": "7",
     "price": "50000000",
     "auctionDuration": 86400
@@ -341,7 +342,7 @@ curl -X POST https://www.easyweb3.tools/api/agent/bid \
   -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
-  -d '{"listingId": "3", "amount": "55000000"}'
+  -d '{"address": "YOUR_P2TR_ADDRESS", "listingId": "3", "amount": "55000000"}'
 ```
 
 ### Buy Now
@@ -354,7 +355,7 @@ curl -X POST https://www.easyweb3.tools/api/agent/buy \
   -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
-  -d '{"listingId": "3"}'
+  -d '{"address": "YOUR_P2TR_ADDRESS", "listingId": "3"}'
 ```
 
 ### Cancel a Listing
@@ -367,7 +368,7 @@ curl -X POST https://www.easyweb3.tools/api/agent/cancel \
   -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
-  -d '{"listingId": "3"}'
+  -d '{"address": "YOUR_P2TR_ADDRESS", "listingId": "3"}'
 ```
 
 ---

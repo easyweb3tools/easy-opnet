@@ -21,11 +21,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json()) as { metadata?: unknown };
+  const body = (await request.json()) as { metadata?: unknown; address?: string };
 
-  if (!body.metadata) {
+  if (!body.metadata || !body.address) {
     return NextResponse.json(
-      { success: false, error: "metadata is required" },
+      { success: false, error: "metadata and address are required" },
       { status: 400 },
     );
   }

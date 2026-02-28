@@ -21,11 +21,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json()) as { tokenId?: string; price?: string };
+  const body = (await request.json()) as {
+    tokenId?: string;
+    price?: string;
+    address?: string;
+  };
 
-  if (!body.tokenId || !body.price) {
+  if (!body.tokenId || !body.price || !body.address) {
     return NextResponse.json(
-      { success: false, error: "tokenId and price are required" },
+      { success: false, error: "tokenId, price, and address are required" },
       { status: 400 },
     );
   }

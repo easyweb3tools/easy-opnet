@@ -21,11 +21,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json()) as { listingId?: string; amount?: string };
+  const body = (await request.json()) as {
+    listingId?: string;
+    amount?: string;
+    address?: string;
+  };
 
-  if (!body.listingId || !body.amount) {
+  if (!body.listingId || !body.amount || !body.address) {
     return NextResponse.json(
-      { success: false, error: "listingId and amount are required" },
+      { success: false, error: "listingId, amount, and address are required" },
       { status: 400 },
     );
   }

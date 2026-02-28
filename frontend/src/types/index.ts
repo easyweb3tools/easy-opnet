@@ -137,6 +137,7 @@ export interface ActivityQueryParams {
 // ── Agent action types ──
 
 export interface MintRequest {
+  readonly address: string;
   readonly metadata: {
     readonly name: string;
     readonly description: string;
@@ -149,21 +150,25 @@ export interface MintRequest {
 }
 
 export interface ListRequest {
+  readonly address: string;
   readonly tokenId: string;
   readonly price: string;
   readonly auctionDuration?: number;
 }
 
 export interface BidRequest {
+  readonly address: string;
   readonly listingId: string;
   readonly amount: string;
 }
 
 export interface BuyRequest {
+  readonly address: string;
   readonly listingId: string;
 }
 
 export interface CancelRequest {
+  readonly address: string;
   readonly listingId: string;
 }
 

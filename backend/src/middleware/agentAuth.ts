@@ -40,21 +40,31 @@ export async function agentAuth(c: Context, next: Next): Promise<Response | void
             claimedAddress = normalizeAgentAddress(rawAddress);
         }
     } catch {
-        // Non-JSON bodies are still allowed for signature verification.
-    }
-
-    const headerAddress = c.req.header('X-Agent-Address');
-    const normalizedHeaderAddress = headerAddress ? normalizeAgentAddress(headerAddress) : null;
-    const resolvedAddress = claimedAddress ?? normalizedHeaderAddress;
-
-    if (!resolvedAddress) {
         return c.json(
-            { success: false, error: 'Missing agent address (provide body.address or X-Agent-Address)' },
+            { success: false, error: 'Invalid JSON body' },
             400,
         );
     }
 
-    if (resolvedAddress && !isValidAgentAddress(resolvedAddress)) {
+    if (!claimedAddress) {
+        return c.json(
+            { success: false, error: 'Missing signed agent address (body.address is required)' },
+            400,
+        );
+    }
+
+    const headerAddress = c.req.header('X-Agent-Address');
+    if (headerAddress) {
+        const normalizedHeaderAddress = normalizeAgentAddress(headerAddress);
+        if (normalizedHeaderAddress !== claimedAddress) {
+            return c.json(
+                { success: false, error: 'X-Agent-Address header must match signed body.address' },
+                403,
+            );
+        }
+    }
+
+    if (!isValidAgentAddress(claimedAddress)) {
         return c.json(
             { success: false, error: 'Invalid agent address format (expected bech32 taproot address)' },
             400,
@@ -62,7 +72,7 @@ export async function agentAuth(c: Context, next: Next): Promise<Response | void
     }
 
     // Store verified identity on context
-    c.set('agentAddress', resolvedAddress);
+    c.set('agentAddress', claimedAddress);
     c.set('agentPublicKey', verification.normalizedPublicKey ?? publicKey);
 
     await next();
