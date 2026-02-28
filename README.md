@@ -100,10 +100,13 @@ npm start              # node dist/index.js
 cd frontend
 npm install
 
-# Development (uses built-in mock API routes)
+# Development (fallback mock API data)
 npm run dev            # → http://localhost:3000
 
-# Development (connected to backend)
+# Development (frontend /api routes proxy to backend)
+BACKEND_BASE_URL=http://localhost:3001 npm run dev
+
+# Optional: direct client-to-backend calls (bypasses /api proxy)
 NEXT_PUBLIC_BACKEND_URL=http://localhost:3001 npm run dev
 
 # Production

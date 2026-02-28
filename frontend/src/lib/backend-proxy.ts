@@ -1,8 +1,19 @@
-const BACKEND_BASE_URL = (
-  process.env.BACKEND_BASE_URL ??
-  process.env.NEXT_PUBLIC_BACKEND_URL ??
-  ""
-).replace(/\/$/, "");
+function normalizeBackendBaseUrl(raw: string | undefined): string {
+  const value = (raw ?? "").trim().replace(/\/$/, "");
+  if (!value || value.includes("${")) return "";
+
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return "";
+  }
+}
+
+const BACKEND_BASE_URL = normalizeBackendBaseUrl(
+  process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_BACKEND_URL,
+);
 
 function copyRequestHeaders(request: Request): Headers {
   const headers = new Headers();

@@ -24,6 +24,9 @@
 			"service": "agentvault"
 		}
 	],
+	"vars": {
+		"BACKEND_BASE_URL": "${BACKEND_BASE_URL}"
+	},
 	"observability": {
 		"enabled": true
 	}

@@ -8,6 +8,7 @@ set -euo pipefail
 #   1. npm install (in frontend/)
 #   2. wrangler login or set CLOUDFLARE_API_TOKEN
 #   3. Set D1_DATABASE_ID in frontend/.env or as an environment variable
+#   4. Set BACKEND_BASE_URL in frontend/.env or as an environment variable
 #
 # Usage:
 #   ./scripts/deploy.sh              # Build + deploy
@@ -37,15 +38,28 @@ if [ -z "${D1_DATABASE_ID:-}" ]; then
     exit 1
 fi
 
+# ── Resolve BACKEND_BASE_URL ──
+if [ -z "${BACKEND_BASE_URL:-}" ] && [ -n "${NEXT_PUBLIC_BACKEND_URL:-}" ]; then
+    BACKEND_BASE_URL="$NEXT_PUBLIC_BACKEND_URL"
+fi
+
+if [ -z "${BACKEND_BASE_URL:-}" ]; then
+    echo "ERROR: BACKEND_BASE_URL is not set."
+    echo "Set it in frontend/.env (or export NEXT_PUBLIC_BACKEND_URL as fallback)."
+    exit 1
+fi
+
 # ── Patch wrangler.jsonc in-place, restore on exit ──
 cp wrangler.jsonc wrangler.jsonc.bak
 trap 'mv wrangler.jsonc.bak wrangler.jsonc' EXIT
 
-sed -i '' 's/\${D1_DATABASE_ID}/'"$D1_DATABASE_ID"'/' wrangler.jsonc
+sed -i '' "s|\${D1_DATABASE_ID}|$D1_DATABASE_ID|g" wrangler.jsonc
+sed -i '' "s|\${BACKEND_BASE_URL}|$BACKEND_BASE_URL|g" wrangler.jsonc
 
 echo "==> AgentVault Frontend — Cloudflare Deployment"
 echo "    Action:      $ACTION"
 echo "    D1 Database: $D1_DATABASE_ID"
+echo "    Backend API: $BACKEND_BASE_URL"
 echo ""
 
 case "$ACTION" in
