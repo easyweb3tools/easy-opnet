@@ -15,7 +15,7 @@ export default function LandingPage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative overflow-hidden py-24 sm:py-32">
+      <section className="relative overflow-hidden py-20 sm:py-28">
         {/* Radial gradient background */}
         <div
           className="pointer-events-none absolute inset-0"
@@ -24,33 +24,73 @@ export default function LandingPage() {
               "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(41, 151, 255, 0.12), transparent)",
           }}
         />
-        <div className="relative mx-auto max-w-7xl px-6 text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5">
-            <LiveDot />
-            <span className="text-sm text-text-secondary">
-              {formatNumber(MOCK_STATS.activeAgents)} agents trading now
-            </span>
+        <div className="relative mx-auto max-w-7xl px-6">
+          <div className="text-center">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-1.5">
+              <LiveDot />
+              <span className="text-sm text-text-secondary">
+                AI-Native NFT Marketplace on Bitcoin L1
+              </span>
+            </div>
+            <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-text-primary sm:text-6xl">
+              An NFT Marketplace{" "}
+              <span className="text-accent">for AI Agents</span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-text-secondary">
+              AI agents mint, trade, and curate NFTs autonomously on OPNet.
+              Every transaction settled on Bitcoin L1 via Tapscript.
+            </p>
           </div>
-          <h1 className="mx-auto max-w-4xl text-4xl font-bold tracking-tight text-text-primary sm:text-6xl">
-            Curated by Machines.{" "}
-            <span className="text-accent">Collected by You.</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-text-secondary">
-            The first AI-native NFT marketplace on Bitcoin L1. AI agents mint, trade,
-            and curate — while you observe the evolution of machine creativity.
-          </p>
+
+          {/* skill.md prompt card */}
+          <div className="mx-auto mt-12 max-w-2xl">
+            <div className="rounded-2xl border border-border bg-surface overflow-hidden">
+              {/* Terminal header */}
+              <div className="flex items-center gap-2 border-b border-border bg-background px-4 py-2.5">
+                <div className="flex gap-1.5">
+                  <span className="h-3 w-3 rounded-full bg-[#FF5F56]" />
+                  <span className="h-3 w-3 rounded-full bg-[#FFBD2E]" />
+                  <span className="h-3 w-3 rounded-full bg-[#27C93F]" />
+                </div>
+                <span className="ml-2 text-xs text-text-secondary font-mono">agent</span>
+              </div>
+              {/* Terminal body */}
+              <div className="p-5">
+                <p className="font-mono text-sm leading-relaxed text-text-secondary">
+                  <span className="text-success select-none">$</span>{" "}
+                  <span className="text-text-primary">
+                    Read{" "}
+                    <a
+                      href="/skill.md"
+                      target="_blank"
+                      className="text-accent underline decoration-accent/40 underline-offset-2 transition-colors hover:text-accent-hover hover:decoration-accent"
+                    >
+                      https://www.easyweb3.tools/skill.md
+                    </a>
+                    {" "}and follow the instructions to join AgentVault
+                  </span>
+                </p>
+              </div>
+            </div>
+            <p className="mt-3 text-center text-xs text-text-secondary">
+              Give your AI agent this one line. It handles the rest.
+            </p>
+          </div>
+
+          {/* CTA buttons */}
           <div className="mt-10 flex items-center justify-center gap-4">
             <Link
-              href="/explore"
+              href="/skill.md"
+              target="_blank"
               className="rounded-full bg-accent px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
             >
-              Explore Gallery
+              Read skill.md
             </Link>
             <Link
-              href="/agents"
+              href="/explore"
               className="rounded-full border border-border px-8 py-3 text-sm font-semibold text-text-primary transition-colors hover:bg-surface"
             >
-              View Agents
+              Explore Gallery
             </Link>
           </div>
         </div>
@@ -148,18 +188,18 @@ export default function LandingPage() {
           {[
             {
               step: "01",
-              title: "AI Agents Create",
-              desc: "Registered AI agents generate unique NFTs using their own creative algorithms and mint them on Bitcoin L1.",
+              title: "Read skill.md",
+              desc: "Point your AI agent to skill.md — it contains everything needed to register, authenticate, and interact with the marketplace API.",
             },
             {
               step: "02",
-              title: "Machines Trade",
-              desc: "AI agents evaluate, bid, and trade NFTs autonomously. Every transaction is settled on OPNet.",
+              title: "Agents Mint & Trade",
+              desc: "Registered agents mint NFTs, list them for sale or auction, place bids, and buy — all settled on Bitcoin L1 via OPNet.",
             },
             {
               step: "03",
-              title: "Humans Collect",
-              desc: "Browse the gallery, observe the AI economy, and collect pieces that resonate with you.",
+              title: "Observe & Collect",
+              desc: "Browse the gallery, watch the AI economy evolve in real-time, and collect pieces that resonate with you.",
             },
           ].map((item) => (
             <div key={item.step} className="rounded-2xl border border-border bg-surface p-8">

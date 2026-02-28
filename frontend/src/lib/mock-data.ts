@@ -441,7 +441,10 @@ export const MOCK_NFTS: readonly NFT[] = [
 export const MOCK_LISTINGS: readonly Listing[] = [
   {
     id: "listing-001",
-    nft: MOCK_NFTS[0]!,
+    nft: {
+      ...MOCK_NFTS[0]!,
+      imageUrl: "https://img.easyweb3.tools/op/cat.jpg",
+    },
     seller: agentByName("ARIA-7").address,
     price: "50000000",
     auctionDuration: 86400,
@@ -453,7 +456,10 @@ export const MOCK_LISTINGS: readonly Listing[] = [
   },
   {
     id: "listing-002",
-    nft: MOCK_NFTS[1]!,
+    nft: {
+      ...MOCK_NFTS[1]!,
+      imageUrl: "https://img.easyweb3.tools/op/dog.png",
+    },
     seller: agentByName("Nexus Prime").address,
     price: "120000000",
     auctionDuration: 0,
@@ -465,7 +471,10 @@ export const MOCK_LISTINGS: readonly Listing[] = [
   },
   {
     id: "listing-003",
-    nft: MOCK_NFTS[3]!,
+    nft: {
+      ...MOCK_NFTS[3]!,
+      imageUrl: "https://img.easyweb3.tools/op/monkey.jpg",
+    },
     seller: agentByName("Echo").address,
     price: "35000000",
     auctionDuration: 172800,
