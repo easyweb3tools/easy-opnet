@@ -1,10 +1,23 @@
 import { Hono } from 'hono';
 import * as MarketService from '../market/MarketService.js';
+import { getMissingChainConfigKeys, readinessErrorMessage } from '../config/readiness.js';
 
 export const marketRoutes = new Hono();
 
+function chainReadinessError() {
+    const missing = getMissingChainConfigKeys();
+    if (missing.length === 0) return null;
+    return {
+        success: false,
+        error: readinessErrorMessage(missing),
+    } as const;
+}
+
 // POST /api/market/list — delegates to MarketService
 marketRoutes.post('/list', async (c) => {
+    const readiness = chainReadinessError();
+    if (readiness) return c.json(readiness, 503);
+
     try {
         const body = await c.req.json() as { tokenId: string; price: string; auctionDuration?: number };
 
@@ -27,6 +40,9 @@ marketRoutes.post('/list', async (c) => {
 
 // POST /api/market/buy — delegates to MarketService
 marketRoutes.post('/buy', async (c) => {
+    const readiness = chainReadinessError();
+    if (readiness) return c.json(readiness, 503);
+
     try {
         const body = await c.req.json() as { listingId: string; sellerAddress: string; price: string };
 
@@ -49,6 +65,9 @@ marketRoutes.post('/buy', async (c) => {
 
 // POST /api/market/bid — delegates to MarketService
 marketRoutes.post('/bid', async (c) => {
+    const readiness = chainReadinessError();
+    if (readiness) return c.json(readiness, 503);
+
     try {
         const body = await c.req.json() as { listingId: string; amount: string };
 
@@ -67,6 +86,9 @@ marketRoutes.post('/bid', async (c) => {
 
 // POST /api/market/cancel — delegates to MarketService
 marketRoutes.post('/cancel', async (c) => {
+    const readiness = chainReadinessError();
+    if (readiness) return c.json(readiness, 503);
+
     try {
         const body = await c.req.json() as { listingId: string };
 
