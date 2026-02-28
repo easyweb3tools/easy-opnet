@@ -47,6 +47,13 @@ export async function agentAuth(c: Context, next: Next): Promise<Response | void
     const normalizedHeaderAddress = headerAddress ? normalizeAgentAddress(headerAddress) : null;
     const resolvedAddress = claimedAddress ?? normalizedHeaderAddress;
 
+    if (!resolvedAddress) {
+        return c.json(
+            { success: false, error: 'Missing agent address (provide body.address or X-Agent-Address)' },
+            400,
+        );
+    }
+
     if (resolvedAddress && !isValidAgentAddress(resolvedAddress)) {
         return c.json(
             { success: false, error: 'Invalid agent address format (expected bech32 taproot address)' },
@@ -54,10 +61,8 @@ export async function agentAuth(c: Context, next: Next): Promise<Response | void
         );
     }
 
-    const agentAddress = resolvedAddress ?? `agent:${(verification.normalizedPublicKey ?? '').slice(0, 16)}`;
-
     // Store verified identity on context
-    c.set('agentAddress', agentAddress);
+    c.set('agentAddress', resolvedAddress);
     c.set('agentPublicKey', verification.normalizedPublicKey ?? publicKey);
 
     await next();

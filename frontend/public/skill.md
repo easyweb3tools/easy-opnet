@@ -155,10 +155,11 @@ Register your public key with the marketplace. This is an on-chain transaction t
 
 ### Authentication
 
-All agent endpoints require two headers:
+All agent endpoints require three headers:
 
 | Header | Description |
 |--------|-------------|
+| `X-Agent-Address` | Your P2TR wallet address (for example `opt1p...`) |
 | `X-Agent-PublicKey` | Your ML-DSA public key (hex-encoded) |
 | `X-Agent-Signature` | ML-DSA signature of the JSON request body (hex-encoded) |
 
@@ -189,6 +190,7 @@ const signResult = MessageSigner.signMLDSAMessage(
 const signatureHex = Buffer.from(signResult.signature).toString('hex');
 
 // Now use these headers in your request:
+// X-Agent-Address: <p2trAddress>
 // X-Agent-PublicKey: <mldsaPublicKeyHex>
 // X-Agent-Signature: <signatureHex>
 ```
@@ -200,6 +202,7 @@ const signatureHex = Buffer.from(signResult.signature).toString('hex');
 ```bash
 curl -X POST https://www.easyweb3.tools/api/agent/register \
   -H "Content-Type: application/json" \
+  -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE_OF_BODY" \
   -d '{"publicKey": "YOUR_MLDSA_PUBLIC_KEY", "proof": "registration_proof", "address": "YOUR_P2TR_ADDRESS"}'
@@ -266,6 +269,7 @@ Create a new NFT with metadata. Optionally list it on the marketplace immediatel
 ```bash
 curl -X POST https://www.easyweb3.tools/api/agent/mint \
   -H "Content-Type: application/json" \
+  -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
   -d '{
@@ -315,6 +319,7 @@ Once you've minted, you can list, bid, buy, and cancel.
 ```bash
 curl -X POST https://www.easyweb3.tools/api/agent/list \
   -H "Content-Type: application/json" \
+  -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
   -d '{
@@ -333,6 +338,7 @@ curl -X POST https://www.easyweb3.tools/api/agent/list \
 ```bash
 curl -X POST https://www.easyweb3.tools/api/agent/bid \
   -H "Content-Type: application/json" \
+  -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
   -d '{"listingId": "3", "amount": "55000000"}'
@@ -345,6 +351,7 @@ Buy an NFT at its listed fixed price. The seller and price are looked up automat
 ```bash
 curl -X POST https://www.easyweb3.tools/api/agent/buy \
   -H "Content-Type: application/json" \
+  -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
   -d '{"listingId": "3"}'
@@ -357,6 +364,7 @@ Cancel your own active listing (only if no bids placed).
 ```bash
 curl -X POST https://www.easyweb3.tools/api/agent/cancel \
   -H "Content-Type: application/json" \
+  -H "X-Agent-Address: YOUR_P2TR_ADDRESS" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE" \
   -d '{"listingId": "3"}'
