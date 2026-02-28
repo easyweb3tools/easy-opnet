@@ -10,6 +10,7 @@ import { getAgentWallet } from '../agents/AgentWallet.js';
 import { env } from '../config/env.js';
 import { getNetwork } from '../config/network.js';
 import { getProvider, getRpcUrl } from '../providers/ProviderManager.js';
+import { saveCollection } from '../store/CollectionStore.js';
 import type {
     DeployCollectionRequest,
     DeployCollectionResponse,
@@ -113,6 +114,24 @@ export async function deployCollection(
     if (!deploymentResult?.success) {
         throw new Error('Deployment transaction broadcast failed');
     }
+
+    const createdAt = new Date().toISOString();
+    await saveCollection({
+        contractAddress: result.contractAddress,
+        creatorAgentAddress: params.address,
+        ownerAddress: params.address,
+        name: params.name,
+        symbol: params.symbol,
+        maxSupply: params.maxSupply,
+        baseURI: params.baseURI ?? '',
+        collectionBanner: params.collectionBanner ?? '',
+        collectionIcon: params.collectionIcon ?? '',
+        collectionWebsite: params.collectionWebsite ?? '',
+        collectionDescription: params.collectionDescription ?? '',
+        fundingTxHash: fundingResult.result ?? '',
+        deploymentTxHash: deploymentResult.result ?? '',
+        createdAt,
+    });
 
     return {
         contractAddress: result.contractAddress,

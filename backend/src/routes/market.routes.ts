@@ -19,13 +19,19 @@ marketRoutes.post('/list', async (c) => {
     if (readiness) return c.json(readiness, 503);
 
     try {
-        const body = await c.req.json() as { tokenId: string; price: string; auctionDuration?: number };
+        const body = await c.req.json() as {
+            nftContractAddress: string;
+            tokenId: string;
+            price: string;
+            auctionDuration?: number;
+        };
 
-        if (!body.tokenId || !body.price) {
-            return c.json({ success: false, error: 'tokenId and price are required' }, 400);
+        if (!body.nftContractAddress || !body.tokenId || !body.price) {
+            return c.json({ success: false, error: 'nftContractAddress, tokenId and price are required' }, 400);
         }
 
         const result = await MarketService.listNFT(
+            body.nftContractAddress,
             body.tokenId,
             body.price,
             body.auctionDuration ?? 0,

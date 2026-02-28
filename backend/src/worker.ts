@@ -6,6 +6,7 @@
  */
 
 let appLoaded: typeof import('./app.js') | null = null;
+let runtimeLoaded = false;
 
 export default {
     async fetch(
@@ -18,6 +19,12 @@ export default {
             if (typeof value === 'string') {
                 process.env[key] = value;
             }
+        }
+
+        if (!runtimeLoaded) {
+            const runtime = await import('./runtime/bindings.js');
+            runtime.setRuntimeBindings(cfEnv);
+            runtimeLoaded = true;
         }
 
         // Lazy-import app so process.env is populated before env.ts evaluates

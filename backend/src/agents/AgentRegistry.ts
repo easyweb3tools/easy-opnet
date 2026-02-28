@@ -1,6 +1,13 @@
 import { getNftContract } from '../providers/ContractCache.js';
 import { getWalletAddress } from './AgentWallet.js';
 import { executeTx } from '../market/TxExecutor.js';
+import {
+    getAgentOwnerAddress,
+    getAgentsByOwnerAddress,
+    getCollectionByCreatorAgent,
+    listCollectionAddresses,
+    saveAgentOwnership,
+} from '../store/CollectionStore.js';
 
 interface ContractCallResult {
     decoded?: Record<string, unknown>;
@@ -9,66 +16,68 @@ interface ContractCallResult {
 
 type ContractMethod = (...args: unknown[]) => Promise<ContractCallResult>;
 
-const ownerToAgents = new Map<string, Set<string>>();
-const agentToOwner = new Map<string, string>();
-
 function normalizeAddress(address: string): string {
     return address.trim().toLowerCase();
 }
 
-function trackAgentOwner(agentAddress: string, ownerAddress: string): void {
-    const agent = normalizeAddress(agentAddress);
-    const owner = normalizeAddress(ownerAddress);
-
-    const previousOwner = agentToOwner.get(agent);
-    if (previousOwner && previousOwner !== owner) {
-        const previousSet = ownerToAgents.get(previousOwner);
-        if (previousSet) {
-            previousSet.delete(agent);
-            if (previousSet.size === 0) {
-                ownerToAgents.delete(previousOwner);
-            }
-        }
-    }
-
-    agentToOwner.set(agent, owner);
-    const set = ownerToAgents.get(owner) ?? new Set<string>();
-    set.add(agent);
-    ownerToAgents.set(owner, set);
-}
-
-/**
- * Checks if an address is a registered agent on-chain via the NFT contract's isAgent() method.
- */
-export async function isRegisteredAgent(address: string): Promise<boolean> {
+async function isAgentInCollection(
+    agentAddress: string,
+    nftContractAddress: string,
+): Promise<boolean> {
     try {
-        const contract = getNftContract(getWalletAddress());
+        const contract = getNftContract(getWalletAddress(), nftContractAddress);
         const callFn = (contract as unknown as Record<string, ContractMethod>).isAgent;
         if (!callFn) return false;
 
-        const result = await callFn(address);
-
-        if (result.error) {
-            console.error('isAgent call failed:', result.error);
-            return false;
-        }
-
+        const result = await callFn(agentAddress);
+        if (result.error) return false;
         return Boolean(result.decoded?.result);
-    } catch (error) {
-        console.error('Failed to check agent registration:', error);
+    } catch {
         return false;
     }
 }
 
 /**
- * Registers a new agent on-chain (deployer only).
+ * Checks if an address is a registered agent on-chain.
+ * If `nftContractAddress` is omitted, scans all known collections.
+ */
+export async function isRegisteredAgent(
+    agentAddress: string,
+    nftContractAddress?: string,
+): Promise<boolean> {
+    if (nftContractAddress) {
+        return isAgentInCollection(agentAddress, nftContractAddress);
+    }
+
+    const collectionAddresses = await listCollectionAddresses();
+    for (const collectionAddress of collectionAddresses) {
+        if (await isAgentInCollection(agentAddress, collectionAddress)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Registers a new agent on-chain in the agent's deployed collection.
  */
 export async function registerAgentOnChain(
     agentAddress: string,
     ownerAddress: string,
+    ownerPublicKey?: string,
 ): Promise<string> {
-    const contract = getNftContract(getWalletAddress());
-    const owner = normalizeAddress(ownerAddress || agentAddress);
+    const normalizedAgent = normalizeAddress(agentAddress);
+    const normalizedOwner = normalizeAddress(ownerAddress || agentAddress);
+
+    const collection = await getCollectionByCreatorAgent(normalizedAgent);
+    if (!collection) {
+        throw new Error(
+            `No collection found for agent ${normalizedAgent}. Deploy collection first via /api/agent/deploy-collection.`,
+        );
+    }
+
+    const contract = getNftContract(getWalletAddress(), collection.contractAddress);
 
     const methods = contract as unknown as Record<string, (...args: unknown[]) => Promise<Record<string, unknown>>>;
     const callWithOwner = methods.registerAgentWithOwner;
@@ -76,47 +85,63 @@ export async function registerAgentOnChain(
 
     let simulation: Record<string, unknown>;
     if (callWithOwner) {
-        simulation = await callWithOwner(agentAddress, owner);
+        simulation = await callWithOwner(normalizedAgent, normalizedOwner);
     } else if (legacyRegister) {
-        simulation = await legacyRegister(agentAddress);
+        simulation = await legacyRegister(normalizedAgent);
     } else {
         throw new Error('registerAgentWithOwner/registerAgent method not found on contract');
     }
 
     const receipt = await executeTx(simulation);
-    trackAgentOwner(agentAddress, owner);
+
+    await saveAgentOwnership({
+        agentAddress: normalizedAgent,
+        ownerAddress: normalizedOwner,
+        ownerPublicKey,
+        collectionContractAddress: collection.contractAddress,
+        txHash: receipt.transactionId,
+        registeredAt: new Date().toISOString(),
+    });
 
     return receipt.transactionId;
 }
 
+/**
+ * Reads owner address for a registered agent.
+ */
 export async function getAgentOwner(agentAddress: string): Promise<string | null> {
-    try {
-        const contract = getNftContract(getWalletAddress());
-        const callFn = (contract as unknown as Record<string, ContractMethod>).getAgentOwner;
-        if (!callFn) {
-            return agentToOwner.get(normalizeAddress(agentAddress)) ?? null;
-        }
+    const normalizedAgent = normalizeAddress(agentAddress);
+    const storedOwner = await getAgentOwnerAddress(normalizedAgent);
+    if (storedOwner) return storedOwner;
 
-        const result = await callFn(agentAddress);
-        if (result.error) {
-            return agentToOwner.get(normalizeAddress(agentAddress)) ?? null;
-        }
+    const collection = await getCollectionByCreatorAgent(normalizedAgent);
+    if (!collection) return null;
+
+    try {
+        const contract = getNftContract(getWalletAddress(), collection.contractAddress);
+        const callFn = (contract as unknown as Record<string, ContractMethod>).getAgentOwner;
+        if (!callFn) return null;
+
+        const result = await callFn(normalizedAgent);
+        if (result.error) return null;
 
         const owner = result.decoded?.owner != null ? String(result.decoded.owner) : '';
-        if (!owner) {
-            return agentToOwner.get(normalizeAddress(agentAddress)) ?? null;
-        }
+        if (!owner) return null;
 
-        trackAgentOwner(agentAddress, owner);
-        return owner;
+        await saveAgentOwnership({
+            agentAddress: normalizedAgent,
+            ownerAddress: normalizeAddress(owner),
+            collectionContractAddress: collection.contractAddress,
+            txHash: undefined,
+            registeredAt: new Date().toISOString(),
+        });
+
+        return normalizeAddress(owner);
     } catch {
-        return agentToOwner.get(normalizeAddress(agentAddress)) ?? null;
+        return null;
     }
 }
 
-export function getAgentsByOwner(ownerAddress: string): string[] {
-    const normalized = normalizeAddress(ownerAddress);
-    const set = ownerToAgents.get(normalized);
-    if (!set) return [];
-    return [...set];
+export async function getAgentsByOwner(ownerAddress: string): Promise<string[]> {
+    return getAgentsByOwnerAddress(ownerAddress);
 }

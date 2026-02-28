@@ -182,8 +182,8 @@ async function main(): Promise<void> {
         console.log('\n========================================');
         console.log('  Deployment Complete');
         console.log('========================================');
-        console.log(`NFT_CONTRACT_ADDRESS=${deployResult.contractAddress}`);
-        console.log('\nAdd this to backend env/secrets.');
+        console.log(`deployed_collection_contract=${deployResult.contractAddress}`);
+        console.log('\nStore this address in your collections database.');
         console.log('========================================');
     } finally {
         if (typeof mnemonic.zeroize === 'function') mnemonic.zeroize();

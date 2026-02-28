@@ -16,6 +16,8 @@ import { getListingState, getListingCount } from '../market/EscrowManager.js';
 import { getTokenOwner, getTokenURI, getBalanceOf } from '../nft/TokenIndexer.js';
 import { getAgentsByOwner, isRegisteredAgent } from '../agents/AgentRegistry.js';
 import { getProvider } from '../providers/ProviderManager.js';
+import { getCollectionByCreatorAgent } from '../store/CollectionStore.js';
+import { resolveDefaultCollectionContract } from '../nft/CollectionResolver.js';
 
 // ── Routes ──
 
@@ -135,8 +137,8 @@ publicRoutes.get('/listings', async (c) => {
 
             // Enrich NFT data
             const [owner, tokenUri] = await Promise.all([
-                getTokenOwner(state.tokenId),
-                getTokenURI(state.tokenId),
+                getTokenOwner(state.tokenId, state.nftContract),
+                getTokenURI(state.tokenId, state.nftContract),
             ]);
 
             const nft: NFT = {
@@ -222,8 +224,8 @@ publicRoutes.get('/listing/:id', async (c) => {
             if (state) {
                 // Enrich NFT data
                 const [owner, tokenUri] = await Promise.all([
-                    getTokenOwner(state.tokenId),
-                    getTokenURI(state.tokenId),
+                    getTokenOwner(state.tokenId, state.nftContract),
+                    getTokenURI(state.tokenId, state.nftContract),
                 ]);
 
                 const nft: NFT = {
@@ -299,9 +301,15 @@ publicRoutes.get('/nft/:tokenId', async (c) => {
     }
 
     try {
+        const nftContractAddress = (c.req.query('contract') ?? '').trim().toLowerCase()
+            || await resolveDefaultCollectionContract();
+        if (!nftContractAddress) {
+            return c.json({ success: false, error: 'No deployed collections found' }, 404);
+        }
+
         const [owner, tokenUri] = await Promise.all([
-            getTokenOwner(tokenId),
-            getTokenURI(tokenId),
+            getTokenOwner(tokenId, nftContractAddress),
+            getTokenURI(tokenId, nftContractAddress),
         ]);
 
         if (!owner) {
@@ -331,15 +339,20 @@ publicRoutes.get('/nft/:tokenId', async (c) => {
 // GET /api/public/agent/:address
 publicRoutes.get('/agent/:address', async (c) => {
     const address = c.req.param('address');
-    const missing = getMissingChainConfigKeys();
+    const missing = getMissingNftConfigKeys();
     if (missing.length > 0) {
         return c.json({ success: false, error: readinessErrorMessage(missing) }, 503);
     }
 
     try {
+        const collection = await getCollectionByCreatorAgent(address);
+        if (!collection) {
+            return c.json({ success: false, error: 'Agent not found (no deployed collection)' }, 404);
+        }
+
         const [registered, balance] = await Promise.all([
-            isRegisteredAgent(address),
-            getBalanceOf(address),
+            isRegisteredAgent(address, collection.contractAddress),
+            getBalanceOf(address, collection.contractAddress),
         ]);
 
         if (!registered) {
@@ -377,8 +390,8 @@ publicRoutes.get('/agent/:address', async (c) => {
         const nfts: NFT[] = [];
         for (const tokenId of mintedTokenIds) {
             const [owner, tokenUri] = await Promise.all([
-                getTokenOwner(tokenId),
-                getTokenURI(tokenId),
+                getTokenOwner(tokenId, collection.contractAddress),
+                getTokenURI(tokenId, collection.contractAddress),
             ]);
             if (owner) {
                 nfts.push({
@@ -466,9 +479,9 @@ publicRoutes.get('/activity', (c) => {
 });
 
 // GET /api/public/agents-by-owner/:address
-publicRoutes.get('/agents-by-owner/:address', (c) => {
+publicRoutes.get('/agents-by-owner/:address', async (c) => {
     const ownerAddress = c.req.param('address').trim().toLowerCase();
-    const agents = getAgentsByOwner(ownerAddress);
+    const agents = await getAgentsByOwner(ownerAddress);
 
     return c.json({
         success: true,

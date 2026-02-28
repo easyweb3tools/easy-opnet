@@ -13,6 +13,7 @@ interface MintResult {
  * Mints an NFT: upload metadata to IPFS → call contract mint().
  */
 export async function mintNFT(
+    nftContractAddress: string,
     to: string,
     metadata: NFTMetadata,
 ): Promise<MintResult> {
@@ -20,7 +21,7 @@ export async function mintNFT(
     const tokenUri = await uploadMetadata(metadata);
 
     // Get contract and simulate
-    const contract = getNftContract(getWalletAddress());
+    const contract = getNftContract(getWalletAddress(), nftContractAddress);
     const mintFn = (contract as unknown as Record<string, (to: string, uri: string) => Promise<Record<string, unknown>>>).mint;
     if (!mintFn) {
         throw new Error('mint method not found on contract');

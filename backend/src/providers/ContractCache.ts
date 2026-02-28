@@ -37,13 +37,17 @@ const MARKETPLACE_ABI: BitcoinInterfaceAbi = [
 // Cache contracts by address:sender key
 const contractCache = new Map<string, unknown>();
 
-export function getNftContract(senderAddress: string): IOP721Contract {
-    const key = `nft:${senderAddress}`;
+export function getNftContract(
+    senderAddress: string,
+    nftContractAddress: string,
+): IOP721Contract {
+    const normalizedContractAddress = nftContractAddress.trim().toLowerCase();
+    const key = `nft:${normalizedContractAddress}:${senderAddress}`;
     const cached = contractCache.get(key);
     if (cached) return cached as IOP721Contract;
 
     const contract = getContract<IOP721Contract>(
-        CONTRACT_ADDRESSES.nft,
+        normalizedContractAddress,
         NFT_ABI,
         getProvider(),
         getNetwork(env.network),

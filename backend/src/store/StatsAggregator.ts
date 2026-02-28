@@ -3,6 +3,7 @@ import { getListingCount, getListingState } from '../market/EscrowManager.js';
 import { getRecentSales, getAllEvents } from './ActivityStore.js';
 import { getNftContract } from '../providers/ContractCache.js';
 import { getWalletAddress } from '../agents/AgentWallet.js';
+import { listCollectionAddresses } from './CollectionStore.js';
 
 interface ContractCallResult {
     decoded?: Record<string, unknown>;
@@ -11,9 +12,9 @@ interface ContractCallResult {
 
 type ContractMethod = (...args: unknown[]) => Promise<ContractCallResult>;
 
-async function getAgentCount(): Promise<number> {
+async function getAgentCountForCollection(nftContractAddress: string): Promise<number> {
     try {
-        const contract = getNftContract(getWalletAddress());
+        const contract = getNftContract(getWalletAddress(), nftContractAddress);
         const fn = (contract as unknown as Record<string, ContractMethod>).getAgentCount;
         if (!fn) return 0;
 
@@ -27,10 +28,14 @@ async function getAgentCount(): Promise<number> {
 }
 
 export async function computeStats(): Promise<MarketplaceStats> {
-    const [totalListingCount, agentCount] = await Promise.all([
+    const [totalListingCount, collectionAddresses] = await Promise.all([
         getListingCount(),
-        getAgentCount(),
+        listCollectionAddresses(),
     ]);
+    const perCollectionAgentCounts = await Promise.all(
+        collectionAddresses.map((address) => getAgentCountForCollection(address)),
+    );
+    const agentCount = perCollectionAgentCounts.reduce((sum, value) => sum + value, 0);
 
     // Scan listings for active count and price stats
     let activeListings = 0;

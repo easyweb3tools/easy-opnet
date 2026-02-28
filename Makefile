@@ -81,13 +81,13 @@ deploy-frontend: ## Deploy frontend to Cloudflare
 	cd frontend && bash scripts/deploy.sh
 
 deploy-backend: ## Deploy backend to Cloudflare Workers
-	cd backend && npm run deploy
+	cd backend && bash scripts/deploy.sh deploy
 
 deploy-staging: ## Deploy backend to staging
-	cd backend && npm run deploy:staging
+	cd backend && bash scripts/deploy.sh staging
 
 deploy-production: ## Deploy backend to production
-	cd backend && npm run deploy:production
+	cd backend && bash scripts/deploy.sh production
 
 # ── Clean ────────────────────────────────────
 

@@ -21,6 +21,7 @@ nftRoutes.post('/mint', async (c) => {
 
     try {
         const body = await c.req.json() as {
+            nftContractAddress: string;
             to: string;
             metadata: {
                 name: string;
@@ -30,11 +31,11 @@ nftRoutes.post('/mint', async (c) => {
             };
         };
 
-        if (!body.to || !body.metadata?.name) {
-            return c.json({ success: false, error: 'to address and metadata.name are required' }, 400);
+        if (!body.nftContractAddress || !body.to || !body.metadata?.name) {
+            return c.json({ success: false, error: 'nftContractAddress, to address and metadata.name are required' }, 400);
         }
 
-        const result = await mintNFT(body.to, body.metadata);
+        const result = await mintNFT(body.nftContractAddress, body.to, body.metadata);
 
         return c.json({ success: true, data: result });
     } catch (error) {
@@ -50,7 +51,12 @@ nftRoutes.get('/owner/:tokenId', async (c) => {
 
     try {
         const tokenId = c.req.param('tokenId');
-        const owner = await getTokenOwner(tokenId);
+        const nftContractAddress = c.req.query('contract');
+        if (!nftContractAddress) {
+            return c.json({ success: false, error: 'contract query parameter is required' }, 400);
+        }
+
+        const owner = await getTokenOwner(tokenId, nftContractAddress);
 
         if (!owner) {
             return c.json({ success: false, error: 'Token not found' }, 404);
@@ -70,7 +76,12 @@ nftRoutes.get('/uri/:tokenId', async (c) => {
 
     try {
         const tokenId = c.req.param('tokenId');
-        const uri = await getTokenURI(tokenId);
+        const nftContractAddress = c.req.query('contract');
+        if (!nftContractAddress) {
+            return c.json({ success: false, error: 'contract query parameter is required' }, 400);
+        }
+
+        const uri = await getTokenURI(tokenId, nftContractAddress);
 
         if (!uri) {
             return c.json({ success: false, error: 'Token not found' }, 404);
@@ -90,7 +101,12 @@ nftRoutes.get('/balance/:address', async (c) => {
 
     try {
         const address = c.req.param('address');
-        const balance = await getBalanceOf(address);
+        const nftContractAddress = c.req.query('contract');
+        if (!nftContractAddress) {
+            return c.json({ success: false, error: 'contract query parameter is required' }, 400);
+        }
+
+        const balance = await getBalanceOf(address, nftContractAddress);
 
         return c.json({ success: true, data: { address, balance: balance.toString() } });
     } catch (error) {

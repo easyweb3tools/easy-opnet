@@ -19,6 +19,7 @@ import {
 } from '../config/readiness.js';
 import { mintNFT } from '../nft/MintService.js';
 import { deployCollection } from '../nft/DeployService.js';
+import { resolveCollectionContractForAgent } from '../nft/CollectionResolver.js';
 import { listNFT, buyNow, placeBid, cancelListing } from '../market/MarketService.js';
 import { getListingState } from '../market/EscrowManager.js';
 import { record } from '../store/ActivityStore.js';
@@ -53,7 +54,7 @@ function requireWalletReady(c: Context): Response | null {
 
 // POST /api/agent/register
 agentRoutes.post('/register', async (c) => {
-    const readinessError = requireChainReady(c);
+    const readinessError = requireWalletReady(c);
     if (readinessError) return readinessError;
 
     const body = await c.req.json() as {
@@ -118,7 +119,11 @@ agentRoutes.post('/register', async (c) => {
     }
 
     try {
-        const txHash = await registerAgentOnChain(agentAddress, ownerAddress);
+        const txHash = await registerAgentOnChain(
+            agentAddress,
+            ownerAddress,
+            ownerVerification.normalizedPublicKey,
+        );
 
         const response: AgentActionResponse = { txHash };
         return c.json({ success: true, data: response });
@@ -190,7 +195,7 @@ agentRoutes.post('/deploy-collection', async (c) => {
 
 // POST /api/agent/mint
 agentRoutes.post('/mint', async (c) => {
-    const readinessError = requireChainReady(c);
+    const readinessError = requireWalletReady(c);
     if (readinessError) return readinessError;
 
     const body = await c.req.json() as MintRequest;
@@ -201,8 +206,9 @@ agentRoutes.post('/mint', async (c) => {
     }
 
     try {
+        const nftContractAddress = await resolveCollectionContractForAgent(agentAddress);
         const recipient = body.recipient ?? agentAddress;
-        const result = await mintNFT(recipient, {
+        const result = await mintNFT(nftContractAddress, recipient, {
             name: body.metadata.name,
             description: body.metadata.description,
             imageUrl: body.metadata.imageUrl ?? '',
@@ -225,7 +231,11 @@ agentRoutes.post('/mint', async (c) => {
         // If listImmediately, also list the NFT
         if (body.listImmediately && body.listPrice) {
             try {
-                const listResult = await listNFT(result.tokenId, body.listPrice);
+                const listResult = await listNFT(
+                    nftContractAddress,
+                    result.tokenId,
+                    body.listPrice,
+                );
                 record({
                     type: 'list',
                     agent: agentAddress,
@@ -265,7 +275,13 @@ agentRoutes.post('/list', async (c) => {
     }
 
     try {
-        const result = await listNFT(body.tokenId, body.price, body.auctionDuration ?? 0);
+        const nftContractAddress = await resolveCollectionContractForAgent(agentAddress);
+        const result = await listNFT(
+            nftContractAddress,
+            body.tokenId,
+            body.price,
+            body.auctionDuration ?? 0,
+        );
 
         record({
             type: 'list',

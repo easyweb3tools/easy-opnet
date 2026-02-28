@@ -31,7 +31,6 @@ export const env = {
     } as Record<NetworkName, string>,
 
     contracts: {
-        nft: optionalEnv('NFT_CONTRACT_ADDRESS', ''),
         marketplace: optionalEnv('MARKETPLACE_CONTRACT_ADDRESS', ''),
     },
 

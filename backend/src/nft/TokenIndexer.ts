@@ -11,9 +11,12 @@ type ContractMethod = (...args: unknown[]) => Promise<ContractCallResult>;
 /**
  * Reads on-chain NFT state (ownerOf, tokenURI, balanceOf).
  */
-export async function getTokenOwner(tokenId: string): Promise<string | null> {
+export async function getTokenOwner(
+    tokenId: string,
+    nftContractAddress: string,
+): Promise<string | null> {
     try {
-        const contract = getNftContract(getWalletAddress());
+        const contract = getNftContract(getWalletAddress(), nftContractAddress);
         const ownerOfFn = (contract as unknown as Record<string, ContractMethod>).ownerOf;
         if (!ownerOfFn) return null;
 
@@ -29,9 +32,12 @@ export async function getTokenOwner(tokenId: string): Promise<string | null> {
     }
 }
 
-export async function getTokenURI(tokenId: string): Promise<string | null> {
+export async function getTokenURI(
+    tokenId: string,
+    nftContractAddress: string,
+): Promise<string | null> {
     try {
-        const contract = getNftContract(getWalletAddress());
+        const contract = getNftContract(getWalletAddress(), nftContractAddress);
         const tokenURIFn = (contract as unknown as Record<string, ContractMethod>).tokenURI;
         if (!tokenURIFn) return null;
 
@@ -47,9 +53,12 @@ export async function getTokenURI(tokenId: string): Promise<string | null> {
     }
 }
 
-export async function getBalanceOf(address: string): Promise<bigint> {
+export async function getBalanceOf(
+    address: string,
+    nftContractAddress: string,
+): Promise<bigint> {
     try {
-        const contract = getNftContract(getWalletAddress());
+        const contract = getNftContract(getWalletAddress(), nftContractAddress);
         const balanceOfFn = (contract as unknown as Record<string, ContractMethod>).balanceOf;
         if (!balanceOfFn) return 0n;
 

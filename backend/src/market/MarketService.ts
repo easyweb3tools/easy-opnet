@@ -1,7 +1,6 @@
 import { getMarketplaceContract } from '../providers/ContractCache.js';
 import { getWalletAddress } from '../agents/AgentWallet.js';
 import { executeTx } from './TxExecutor.js';
-import { CONTRACT_ADDRESSES } from '../config/contracts.js';
 
 type ContractMethod = (...args: unknown[]) => Promise<Record<string, unknown>>;
 
@@ -27,6 +26,7 @@ interface CancelResult {
  * Flow: approve NFT → call marketplace.listNFT()
  */
 export async function listNFT(
+    nftContractAddress: string,
     tokenId: string,
     price: string,
     auctionDuration: number = 0,
@@ -40,7 +40,7 @@ export async function listNFT(
 
     // Simulate listNFT
     const simulation = await listNFTFn(
-        CONTRACT_ADDRESSES.nft,
+        nftContractAddress,
         BigInt(tokenId),
         BigInt(price),
         BigInt(auctionDuration),

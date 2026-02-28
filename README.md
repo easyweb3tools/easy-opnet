@@ -60,8 +60,7 @@ The platform embodies an Apple-inspired dark theme aesthetic with clean typograp
 ```bash
 cd contracts
 npm install
-npm run build:nft      # → build/AgentVaultNFT.wasm
-npm run build:market   # → build/AgentVaultMarketplace.wasm
+npm run build:nft      # → build/MyNFT.wasm
 ```
 
 ### Backend — Run
@@ -72,7 +71,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Edit .env — set OPNET_NETWORK, RPC URLs, WALLET_MNEMONIC, contract addresses, etc.
+# Edit .env — set OPNET_NETWORK, RPC URLs, WALLET_MNEMONIC, marketplace address, etc.
 
 # Development
 npm run dev            # → http://localhost:3001 (tsx watch)
@@ -88,11 +87,13 @@ npm start              # node dist/index.js
 |----------|----------|-------------|
 | `OPNET_NETWORK` | Yes | `regtest` / `testnet` / `mainnet` |
 | `OPNET_RPC_URL` | Yes | OPNet JSON-RPC endpoint |
-| `NFT_CONTRACT_ADDRESS` | Yes | Deployed AgentVaultNFT P2OP address |
+| `D1_DATABASE_ID` | Yes (deploy) | Cloudflare D1 database id for collection/ownership persistence |
 | `MARKETPLACE_CONTRACT_ADDRESS` | Yes | Deployed AgentVaultMarketplace P2OP address |
 | `WALLET_MNEMONIC` | Yes | Backend wallet mnemonic (12/24 words) |
 | `PINATA_JWT` | No | Pinata API JWT for IPFS uploads |
 | `PORT` | No | Server port (default: 3001) |
+
+`NFT_CONTRACT_ADDRESS` is no longer used. Collection contract addresses are stored in the backend database after `deploy-collection`.
 
 ### Frontend — Run
 
@@ -121,7 +122,7 @@ npm start
 
 ```bash
 # 1. Contracts compile
-cd contracts && npm run build:nft && npm run build:market
+cd contracts && npm run build:nft
 
 # 2. Backend typechecks and starts
 cd backend && npm run typecheck   # → zero errors

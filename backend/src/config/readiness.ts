@@ -10,9 +10,6 @@ export function getMissingChainConfigKeys(): string[] {
     if (!hasValue(env.walletMnemonic)) {
         missing.push('WALLET_MNEMONIC');
     }
-    if (!hasValue(env.contracts.nft)) {
-        missing.push('NFT_CONTRACT_ADDRESS');
-    }
     if (!hasValue(env.contracts.marketplace)) {
         missing.push('MARKETPLACE_CONTRACT_ADDRESS');
     }
@@ -25,9 +22,6 @@ export function getMissingNftConfigKeys(): string[] {
 
     if (!hasValue(env.walletMnemonic)) {
         missing.push('WALLET_MNEMONIC');
-    }
-    if (!hasValue(env.contracts.nft)) {
-        missing.push('NFT_CONTRACT_ADDRESS');
     }
 
     return missing;
@@ -44,5 +38,5 @@ export function getMissingWalletConfigKeys(): string[] {
 }
 
 export function readinessErrorMessage(missingKeys: readonly string[]): string {
-    return `Backend not configured for on-chain operations. Missing: ${missingKeys.join(', ')}. Deploy contracts (npm run deploy:contracts), then set missing env vars and restart backend.`;
+    return `Backend not configured for on-chain operations. Missing: ${missingKeys.join(', ')}. Configure missing env vars and restart backend.`;
 }
