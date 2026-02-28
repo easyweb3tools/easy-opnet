@@ -13,7 +13,8 @@
     "deploy:staging": "wrangler deploy --env staging",
     "deploy:production": "wrangler deploy --env production",
     "cf:dev": "wrangler dev",
-    "cf:secret": "wrangler secret put"
+    "cf:secret": "wrangler secret put",
+    "deploy:contracts": "tsx scripts/deploy-contracts.ts"
   },
   "dependencies": {
     "@btc-vision/bip32": "latest",

@@ -28,12 +28,16 @@ export async function mintNFT(
 
     const simulation = await mintFn(to, tokenUri);
 
+    // Extract tokenId from simulation decoded result
+    const decoded = (simulation as { decoded?: Record<string, unknown> }).decoded;
+    const tokenId = decoded?.tokenId != null ? String(decoded.tokenId) : '0';
+
     // Execute transaction
     const receipt = await executeTx(simulation);
 
     return {
         txHash: receipt.transactionId,
-        tokenId: '0', // TODO: Parse from receipt events
+        tokenId,
         tokenUri,
     };
 }

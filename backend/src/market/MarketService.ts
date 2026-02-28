@@ -46,11 +46,15 @@ export async function listNFT(
         BigInt(auctionDuration),
     );
 
+    // Extract listingId from simulation decoded result
+    const decoded = (simulation as { decoded?: Record<string, unknown> }).decoded;
+    const listingId = decoded?.listingId != null ? String(decoded.listingId) : '0';
+
     const receipt = await executeTx(simulation);
 
     return {
         txHash: receipt.transactionId,
-        listingId: '0', // TODO: Parse from receipt events
+        listingId,
     };
 }
 
@@ -75,7 +79,6 @@ export async function buyNow(
                 {
                     to: sellerAddress,
                     value: BigInt(price),
-                    index: 1, // Index 0 is reserved
                 },
             ],
         });
