@@ -39,10 +39,20 @@ export async function GET(request: NextRequest) {
   // Sort
   switch (sort) {
     case "price_asc":
-      filtered.sort((a, b) => Number(a.price) - Number(b.price));
+      filtered.sort((a, b) => {
+        const left = BigInt(a.price);
+        const right = BigInt(b.price);
+        if (left === right) return 0;
+        return left < right ? -1 : 1;
+      });
       break;
     case "price_desc":
-      filtered.sort((a, b) => Number(b.price) - Number(a.price));
+      filtered.sort((a, b) => {
+        const left = BigInt(a.price);
+        const right = BigInt(b.price);
+        if (left === right) return 0;
+        return left > right ? -1 : 1;
+      });
       break;
     case "most_bids":
       filtered.sort((a, b) => b.bidCount - a.bidCount);
