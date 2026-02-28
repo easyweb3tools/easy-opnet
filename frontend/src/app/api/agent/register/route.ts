@@ -15,11 +15,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json()) as { publicKey?: string; proof?: string };
+  const body = (await request.json()) as {
+    publicKey?: string;
+    proof?: string;
+    address?: string;
+  };
 
-  if (!body.publicKey || !body.proof) {
+  if (!body.publicKey || !body.proof || !body.address) {
     return NextResponse.json(
-      { success: false, error: "publicKey and proof are required" },
+      { success: false, error: "publicKey, proof, and address are required" },
       { status: 400 },
     );
   }

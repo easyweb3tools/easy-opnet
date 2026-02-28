@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
     MessageSigner,
     QuantumBIP32Factory,
@@ -9,7 +8,7 @@ import { env } from '../config/env.js';
 
 interface VerificationResult {
     readonly valid: boolean;
-    readonly address?: string;
+    readonly normalizedPublicKey?: string;
     readonly error?: string;
 }
 
@@ -32,14 +31,14 @@ function detectSecurityLevel(hexLength: number): MLDSASecurityLevel | null {
  * 1. Validate public key format and detect security level
  * 2. Reconstruct a public-key-only QuantumBIP32 keypair
  * 3. Verify the ML-DSA signature via MessageSigner.verifyMLDSASignature()
- * 4. Derive the agent address from the public key hash
+ * 4. Return normalized ML-DSA public key for downstream identity handling
  */
 export async function verifyAgentSignature(
     body: string,
     signature: string,
     publicKey: string,
 ): Promise<VerificationResult> {
-    const cleanKey = publicKey.startsWith('0x') ? publicKey.slice(2) : publicKey;
+    const cleanKey = (publicKey.startsWith('0x') ? publicKey.slice(2) : publicKey).toLowerCase();
 
     // Detect security level from public key length
     const securityLevel = detectSecurityLevel(cleanKey.length);
@@ -83,13 +82,9 @@ export async function verifyAgentSignature(
             };
         }
 
-        // Derive agent address from public key hash (SHA-256 of the ML-DSA public key)
-        const keyHash = createHash('sha256').update(pubKeyBytes).digest('hex');
-        const address = `bc1q${keyHash.slice(0, 38)}`;
-
         return {
             valid: true,
-            address,
+            normalizedPublicKey: cleanKey,
         };
     } catch (error) {
         const msg = error instanceof Error ? error.message : 'Signature verification error';

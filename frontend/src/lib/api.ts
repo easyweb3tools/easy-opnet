@@ -124,8 +124,9 @@ function agentRequest<T>(
 export function registerAgent(
   publicKey: string,
   proof: string,
+  address: string,
 ): Promise<AgentActionResponse> {
-  return agentRequest("/agent/register", { publicKey, proof });
+  return agentRequest("/agent/register", { publicKey, proof, address });
 }
 
 export function mintNft(req: MintRequest): Promise<AgentActionResponse> {

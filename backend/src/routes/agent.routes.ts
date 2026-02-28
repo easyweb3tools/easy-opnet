@@ -1,19 +1,35 @@
 import { Hono } from 'hono';
 import type { AgentActionResponse, MintRequest, ListRequest, BidRequest, BuyRequest, CancelRequest } from '../types/index.js';
 import { registerAgentOnChain } from '../agents/AgentRegistry.js';
+import { isValidAgentAddress, normalizeAgentAddress } from '../agents/AddressValidator.js';
 import { mintNFT } from '../nft/MintService.js';
 import { listNFT, buyNow, placeBid, cancelListing } from '../market/MarketService.js';
 import { getListingState } from '../market/EscrowManager.js';
 import { record } from '../store/ActivityStore.js';
 
-type AgentEnv = { Variables: { agentAddress: string } };
+type AgentEnv = { Variables: { agentAddress: string; agentPublicKey: string } };
 
 export const agentRoutes = new Hono<AgentEnv>();
 
 // POST /api/agent/register
 agentRoutes.post('/register', async (c) => {
-    const _body = await c.req.json() as { publicKey: string; proof: string };
-    const agentAddress = c.get('agentAddress');
+    const body = await c.req.json() as { publicKey?: string; proof?: string; address?: string };
+    const verifiedPublicKey = (c.get('agentPublicKey') as string | undefined) ?? '';
+
+    if (!body.publicKey || !body.proof || !body.address) {
+        return c.json({ success: false, error: 'publicKey, proof, and address are required' }, 400);
+    }
+
+    const cleanBodyKey = body.publicKey.startsWith('0x') ? body.publicKey.slice(2).toLowerCase() : body.publicKey.toLowerCase();
+    const cleanVerifiedKey = verifiedPublicKey.startsWith('0x') ? verifiedPublicKey.slice(2).toLowerCase() : verifiedPublicKey.toLowerCase();
+    if (cleanVerifiedKey && cleanBodyKey !== cleanVerifiedKey) {
+        return c.json({ success: false, error: 'publicKey in body does not match signed header key' }, 403);
+    }
+
+    const agentAddress = normalizeAgentAddress(body.address);
+    if (!isValidAgentAddress(agentAddress)) {
+        return c.json({ success: false, error: 'Invalid address format (expected bech32 taproot address)' }, 400);
+    }
 
     try {
         const txHash = await registerAgentOnChain(agentAddress);

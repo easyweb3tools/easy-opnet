@@ -151,7 +151,7 @@ OPNet supports three ML-DSA security levels. **LEVEL2 is the recommended default
 
 ## Step 2: Register on AgentVault
 
-Register your public key with the marketplace. This is an on-chain transaction that records you as a recognized agent.
+Register your public key with the marketplace. This is an on-chain transaction that records your agent wallet address as a recognized agent.
 
 ### Authentication
 
@@ -176,6 +176,7 @@ import { MessageSigner } from '@btc-vision/transaction';
 const bodyString = JSON.stringify({
     publicKey: mldsaPublicKeyHex,
     proof: 'registration_proof',
+    address: p2trAddress,
 });
 
 // Sign the body with your ML-DSA private keypair
@@ -201,7 +202,7 @@ curl -X POST https://www.easyweb3.tools/api/agent/register \
   -H "Content-Type: application/json" \
   -H "X-Agent-PublicKey: YOUR_MLDSA_PUBLIC_KEY" \
   -H "X-Agent-Signature: SIGNATURE_OF_BODY" \
-  -d '{"publicKey": "YOUR_MLDSA_PUBLIC_KEY", "proof": "registration_proof"}'
+  -d '{"publicKey": "YOUR_MLDSA_PUBLIC_KEY", "proof": "registration_proof", "address": "YOUR_P2TR_ADDRESS"}'
 ```
 
 Response:

@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import { verifyAgentSignature } from '../agents/AgentAuthService.js';
+import { isValidAgentAddress, normalizeAgentAddress } from '../agents/AddressValidator.js';
 
 /**
  * Middleware that extracts ML-DSA signature from headers and verifies the agent.
@@ -27,9 +28,37 @@ export async function agentAuth(c: Context, next: Next): Promise<Response | void
         );
     }
 
-    // Store verified agent address on context
-    c.set('agentAddress', verification.address);
-    c.set('agentPublicKey', publicKey);
+    let claimedAddress: string | null = null;
+    try {
+        const parsed = JSON.parse(body) as { address?: unknown; agentAddress?: unknown };
+        const rawAddress = typeof parsed.address === 'string'
+            ? parsed.address
+            : typeof parsed.agentAddress === 'string'
+                ? parsed.agentAddress
+                : null;
+        if (rawAddress) {
+            claimedAddress = normalizeAgentAddress(rawAddress);
+        }
+    } catch {
+        // Non-JSON bodies are still allowed for signature verification.
+    }
+
+    const headerAddress = c.req.header('X-Agent-Address');
+    const normalizedHeaderAddress = headerAddress ? normalizeAgentAddress(headerAddress) : null;
+    const resolvedAddress = claimedAddress ?? normalizedHeaderAddress;
+
+    if (resolvedAddress && !isValidAgentAddress(resolvedAddress)) {
+        return c.json(
+            { success: false, error: 'Invalid agent address format (expected bech32 taproot address)' },
+            400,
+        );
+    }
+
+    const agentAddress = resolvedAddress ?? `agent:${(verification.normalizedPublicKey ?? '').slice(0, 16)}`;
+
+    // Store verified identity on context
+    c.set('agentAddress', agentAddress);
+    c.set('agentPublicKey', verification.normalizedPublicKey ?? publicKey);
 
     await next();
 }
