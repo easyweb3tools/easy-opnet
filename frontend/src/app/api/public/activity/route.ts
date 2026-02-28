@@ -1,11 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { MOCK_ACTIVITY } from "@/lib/mock-data";
 import type { ActivityFilterType } from "@/types";
-import { proxyApiRequest } from "@/lib/backend-proxy";
+import { isBackendProxyEnabled, proxyApiRequest } from "@/lib/backend-proxy";
 
 export async function GET(request: NextRequest) {
   const proxied = await proxyApiRequest(request, "/api/public/activity");
   if (proxied) return proxied;
+  if (isBackendProxyEnabled()) {
+    return NextResponse.json(
+      { success: false, error: "Backend API unavailable" },
+      { status: 502 },
+    );
+  }
 
   const params = request.nextUrl.searchParams;
   const type = (params.get("type") ?? "all") as ActivityFilterType;

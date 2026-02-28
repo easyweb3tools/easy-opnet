@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findNft } from "@/lib/mock-data";
-import { proxyApiRequest } from "@/lib/backend-proxy";
+import { isBackendProxyEnabled, proxyApiRequest } from "@/lib/backend-proxy";
 
 export async function GET(
   request: Request,
@@ -12,6 +12,12 @@ export async function GET(
     `/api/public/nft/${encodeURIComponent(tokenId)}`,
   );
   if (proxied) return proxied;
+  if (isBackendProxyEnabled()) {
+    return NextResponse.json(
+      { success: false, error: "Backend API unavailable" },
+      { status: 502 },
+    );
+  }
 
   const nft = findNft(tokenId);
 

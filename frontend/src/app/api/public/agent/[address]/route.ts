@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findAgent, getAgentNfts, getAgentListings, getAgentActivity } from "@/lib/mock-data";
-import { proxyApiRequest } from "@/lib/backend-proxy";
+import { isBackendProxyEnabled, proxyApiRequest } from "@/lib/backend-proxy";
 
 export async function GET(
   request: Request,
@@ -13,6 +13,12 @@ export async function GET(
     `/api/public/agent/${encodeURIComponent(decodedAddress)}`,
   );
   if (proxied) return proxied;
+  if (isBackendProxyEnabled()) {
+    return NextResponse.json(
+      { success: false, error: "Backend API unavailable" },
+      { status: 502 },
+    );
+  }
 
   const agent = findAgent(decodedAddress);
 

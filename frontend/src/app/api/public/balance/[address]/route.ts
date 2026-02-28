@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { proxyApiRequest } from "@/lib/backend-proxy";
+import { isBackendProxyEnabled, proxyApiRequest } from "@/lib/backend-proxy";
 
 function fallbackBalanceFor(address: string): string {
   // Deterministic mock value, only used when backend proxy is unavailable.
@@ -22,6 +22,12 @@ export async function GET(
     `/api/public/balance/${encodeURIComponent(address)}`,
   );
   if (proxied) return proxied;
+  if (isBackendProxyEnabled()) {
+    return NextResponse.json(
+      { success: false, error: "Backend API unavailable" },
+      { status: 502 },
+    );
+  }
 
   return NextResponse.json({
     success: true,

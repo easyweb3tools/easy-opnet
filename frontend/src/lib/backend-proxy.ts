@@ -15,6 +15,10 @@ const BACKEND_BASE_URL = normalizeBackendBaseUrl(
   process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_BACKEND_URL,
 );
 
+export function isBackendProxyEnabled(): boolean {
+  return BACKEND_BASE_URL.length > 0;
+}
+
 function copyRequestHeaders(request: Request): Headers {
   const headers = new Headers();
 
