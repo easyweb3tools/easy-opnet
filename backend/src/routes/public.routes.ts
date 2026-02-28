@@ -23,6 +23,10 @@ export const publicRoutes = new Hono();
 const ALLOW_DEV_SEED_LISTINGS = process.env.ALLOW_DEV_SEED_LISTINGS === '1'
     || (env.network === 'regtest' && process.env.ALLOW_DEV_SEED_LISTINGS !== '0');
 
+function shouldRequireChainReadiness(): boolean {
+    return !ALLOW_DEV_SEED_LISTINGS;
+}
+
 function sortListings(listings: Listing[], sort: string): void {
     switch (sort) {
         case 'price_asc':
@@ -64,6 +68,11 @@ function sortListings(listings: Listing[], sort: string): void {
 
 // GET /api/public/stats
 publicRoutes.get('/stats', async (c) => {
+    const missing = getMissingChainConfigKeys();
+    if (missing.length > 0 && shouldRequireChainReadiness()) {
+        return c.json({ success: false, error: readinessErrorMessage(missing) }, 503);
+    }
+
     try {
         const stats = await computeStats();
         return c.json({ success: true, data: stats });
@@ -84,6 +93,11 @@ publicRoutes.get('/listings', async (c) => {
     const offset = parseInt(c.req.query('offset') ?? '0', 10);
 
     try {
+        const missing = getMissingChainConfigKeys();
+        if (missing.length > 0 && shouldRequireChainReadiness()) {
+            return c.json({ success: false, error: readinessErrorMessage(missing) }, 503);
+        }
+
         const totalCount = await getListingCount();
         const listings: Listing[] = [];
 
@@ -184,6 +198,11 @@ publicRoutes.get('/listing/:id', async (c) => {
     const id = c.req.param('id');
 
     try {
+        const missing = getMissingChainConfigKeys();
+        if (missing.length > 0 && shouldRequireChainReadiness()) {
+            return c.json({ success: false, error: readinessErrorMessage(missing) }, 503);
+        }
+
         let listing: Listing | null = null;
 
         // On-chain ids are numeric. Non-numeric ids are handled by dev seed fallback.
