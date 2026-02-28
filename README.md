@@ -109,6 +109,9 @@ BACKEND_BASE_URL=http://localhost:3001 npm run dev
 # Optional: direct client-to-backend calls (bypasses /api proxy)
 NEXT_PUBLIC_BACKEND_URL=http://localhost:3001 npm run dev
 
+# Optional: force-enable mock fallback in production runtime (debug only)
+ALLOW_MOCK_API=1 npm run dev
+
 # Production
 npm run build
 npm start
@@ -127,6 +130,10 @@ cd backend && npm run dev         # → http://localhost:3001
 # 3. Health check
 curl http://localhost:3001/health
 # → {"status":"ok","network":"regtest","timestamp":"..."}
+
+# 3b. Readiness check (expects 503 until mnemonic + contracts are configured)
+curl http://localhost:3001/health/readiness
+# → {"status":"not_ready","ready":false,"missing":{"chain":[...],"nft":[...]},...}
 
 # 4. API test
 curl http://localhost:3001/api/public/stats

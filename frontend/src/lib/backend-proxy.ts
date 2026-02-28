@@ -14,9 +14,12 @@ function normalizeBackendBaseUrl(raw: string | undefined): string {
 const BACKEND_BASE_URL = normalizeBackendBaseUrl(
   process.env.BACKEND_BASE_URL ?? process.env.NEXT_PUBLIC_BACKEND_URL,
 );
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const ALLOW_MOCK_API = process.env.ALLOW_MOCK_API === "1";
 
 export function isBackendProxyEnabled(): boolean {
-  return BACKEND_BASE_URL.length > 0;
+  if (BACKEND_BASE_URL.length > 0) return true;
+  return IS_PRODUCTION && !ALLOW_MOCK_API;
 }
 
 function copyRequestHeaders(request: Request): Headers {

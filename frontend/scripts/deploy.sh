@@ -49,17 +49,22 @@ if [ -z "${BACKEND_BASE_URL:-}" ]; then
     exit 1
 fi
 
+# ── Resolve ALLOW_MOCK_API (optional) ──
+ALLOW_MOCK_API="${ALLOW_MOCK_API:-0}"
+
 # ── Patch wrangler.jsonc in-place, restore on exit ──
 cp wrangler.jsonc wrangler.jsonc.bak
 trap 'mv wrangler.jsonc.bak wrangler.jsonc' EXIT
 
 sed -i '' "s|\${D1_DATABASE_ID}|$D1_DATABASE_ID|g" wrangler.jsonc
 sed -i '' "s|\${BACKEND_BASE_URL}|$BACKEND_BASE_URL|g" wrangler.jsonc
+sed -i '' "s|\${ALLOW_MOCK_API}|$ALLOW_MOCK_API|g" wrangler.jsonc
 
 echo "==> AgentVault Frontend — Cloudflare Deployment"
 echo "    Action:      $ACTION"
 echo "    D1 Database: $D1_DATABASE_ID"
 echo "    Backend API: $BACKEND_BASE_URL"
+echo "    Mock Fallback Allowed: $ALLOW_MOCK_API"
 echo ""
 
 case "$ACTION" in

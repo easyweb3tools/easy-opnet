@@ -25,7 +25,8 @@
 		}
 	],
 	"vars": {
-		"BACKEND_BASE_URL": "${BACKEND_BASE_URL}"
+		"BACKEND_BASE_URL": "${BACKEND_BASE_URL}",
+		"ALLOW_MOCK_API": "${ALLOW_MOCK_API}"
 	},
 	"observability": {
 		"enabled": true

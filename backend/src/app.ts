@@ -9,6 +9,7 @@ import { marketRoutes } from './routes/market.routes.js';
 import { nftRoutes } from './routes/nft.routes.js';
 import { agentAuth } from './middleware/agentAuth.js';
 import { rateLimit } from './middleware/rateLimit.js';
+import { getMissingChainConfigKeys, getMissingNftConfigKeys } from './config/readiness.js';
 
 const app = new Hono();
 
@@ -23,6 +24,26 @@ app.get('/health', (c) => {
         network: env.network,
         timestamp: new Date().toISOString(),
     });
+});
+
+// ── Readiness check (on-chain dependencies) ──
+app.get('/health/readiness', (c) => {
+    const missing = {
+        chain: getMissingChainConfigKeys(),
+        nft: getMissingNftConfigKeys(),
+    };
+    const ready = missing.chain.length === 0;
+
+    return c.json(
+        {
+            status: ready ? 'ready' : 'not_ready',
+            network: env.network,
+            ready,
+            missing,
+            timestamp: new Date().toISOString(),
+        },
+        ready ? 200 : 503,
+    );
 });
 
 // ── Public routes (no auth) ──
