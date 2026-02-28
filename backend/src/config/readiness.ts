@@ -34,5 +34,5 @@ export function getMissingNftConfigKeys(): string[] {
 }
 
 export function readinessErrorMessage(missingKeys: readonly string[]): string {
-    return `Backend not configured for on-chain operations. Missing: ${missingKeys.join(', ')}`;
+    return `Backend not configured for on-chain operations. Missing: ${missingKeys.join(', ')}. Deploy contracts (npm run deploy:contracts), then set missing env vars and restart backend.`;
 }

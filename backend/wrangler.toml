@@ -12,6 +12,7 @@ OPNET_RPC_URL_REGTEST = "https://regtest.opnet.org"
 OPNET_RPC_URL_TESTNET = "https://testnet.opnet.org"
 OPNET_RPC_URL_MAINNET = "https://mainnet.opnet.org"
 PORT = "3001"
+ALLOW_DEV_SEED_LISTINGS = "0"
 
 # ── Build ──
 [build]
