@@ -30,10 +30,20 @@ function shouldRequireChainReadiness(): boolean {
 function sortListings(listings: Listing[], sort: string): void {
     switch (sort) {
         case 'price_asc':
-            listings.sort((a, b) => Number(BigInt(a.price) - BigInt(b.price)));
+            listings.sort((a, b) => {
+                const left = BigInt(a.price);
+                const right = BigInt(b.price);
+                if (left === right) return 0;
+                return left < right ? -1 : 1;
+            });
             break;
         case 'price_desc':
-            listings.sort((a, b) => Number(BigInt(b.price) - BigInt(a.price)));
+            listings.sort((a, b) => {
+                const left = BigInt(a.price);
+                const right = BigInt(b.price);
+                if (left === right) return 0;
+                return left > right ? -1 : 1;
+            });
             break;
         case 'most_bids':
             listings.sort((a, b) => b.bidCount - a.bidCount);
