@@ -35,6 +35,7 @@ if (!MNEMONIC) {
 
 const NFT_WASM = path.resolve(__dirname, '../../contracts/build/AgentVaultNFT.wasm');
 const MARKETPLACE_WASM = path.resolve(__dirname, '../../contracts/build/AgentVaultMarketplace.wasm');
+const MIN_RECOMMENDED_BALANCE = 200_000n;
 
 async function main(): Promise<void> {
     // Validate WASM files exist
@@ -55,6 +56,15 @@ async function main(): Promise<void> {
     const limitedProvider = new OPNetLimitedProvider(RPC_URL);
     const jsonRpcProvider = new JSONRpcProvider({ url: RPC_URL, network });
 
+    // Preflight: verify wallet has funds before attempting any deployment tx.
+    const currentBalance = await jsonRpcProvider.getBalance(wallet.p2tr, true);
+    console.log(`Wallet balance: ${currentBalance} sats`);
+    if (currentBalance < MIN_RECOMMENDED_BALANCE) {
+        throw new Error(
+            `Insufficient balance for deployment. Need at least ${MIN_RECOMMENDED_BALANCE} sats, got ${currentBalance}. Fund ${wallet.p2tr} and retry.`,
+        );
+    }
+
     // Fetch challenge from the provider
     const challenge = await jsonRpcProvider.getChallenge();
 
@@ -68,6 +78,9 @@ async function main(): Promise<void> {
         minAmount: 10_000n,
         requestedAmount: 500_000n,
     });
+    if (nftUtxos.length === 0) {
+        throw new Error(`No spendable UTXOs found for ${wallet.p2tr}. Fund wallet and retry.`);
+    }
     console.log(`Found ${nftUtxos.length} UTXOs for NFT deployment`);
 
     const factory = new TransactionFactory();
@@ -89,9 +102,15 @@ async function main(): Promise<void> {
 
     // Broadcast funding TX, then deployment TX
     const nftFundBroadcast = await limitedProvider.broadcastTransaction(nftResult.transaction[0], false);
+    if (!nftFundBroadcast?.success) {
+        throw new Error('Failed to broadcast NFT funding transaction');
+    }
     console.log(`NFT funding TX broadcast: ${nftFundBroadcast?.success ? 'OK' : 'FAILED'}`);
 
     const nftDeployBroadcast = await limitedProvider.broadcastTransaction(nftResult.transaction[1], false);
+    if (!nftDeployBroadcast?.success) {
+        throw new Error('Failed to broadcast NFT deployment transaction');
+    }
     console.log(`NFT deployment TX broadcast: ${nftDeployBroadcast?.success ? 'OK' : 'FAILED'}`);
 
     // Wait for confirmation
@@ -111,6 +130,9 @@ async function main(): Promise<void> {
         minAmount: 10_000n,
         requestedAmount: 500_000n,
     });
+    if (marketUtxos.length === 0) {
+        throw new Error(`No spendable UTXOs found for ${wallet.p2tr} before marketplace deployment.`);
+    }
     console.log(`Found ${marketUtxos.length} UTXOs for Marketplace deployment`);
 
     const marketResult = await factory.signDeployment({
@@ -129,9 +151,15 @@ async function main(): Promise<void> {
     console.log(`Marketplace Contract address: ${marketResult.contractAddress}`);
 
     const mktFundBroadcast = await limitedProvider.broadcastTransaction(marketResult.transaction[0], false);
+    if (!mktFundBroadcast?.success) {
+        throw new Error('Failed to broadcast marketplace funding transaction');
+    }
     console.log(`Marketplace funding TX broadcast: ${mktFundBroadcast?.success ? 'OK' : 'FAILED'}`);
 
     const mktDeployBroadcast = await limitedProvider.broadcastTransaction(marketResult.transaction[1], false);
+    if (!mktDeployBroadcast?.success) {
+        throw new Error('Failed to broadcast marketplace deployment transaction');
+    }
     console.log(`Marketplace deployment TX broadcast: ${mktDeployBroadcast?.success ? 'OK' : 'FAILED'}`);
 
     console.log('Waiting 10s for Marketplace contract confirmation...');
@@ -204,8 +232,8 @@ async function main(): Promise<void> {
     }
 
     // Clean up
-    mnemonic.zeroize();
-    wallet.zeroize();
+    if (typeof mnemonic.zeroize === 'function') mnemonic.zeroize();
+    if (typeof wallet.zeroize === 'function') wallet.zeroize();
     await jsonRpcProvider.close();
 
     console.log('\n========================================');
