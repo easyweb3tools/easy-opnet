@@ -11,6 +11,7 @@ import { computeStats } from '../store/StatsAggregator.js';
 import { query as queryActivity, getEventsByAgent } from '../store/ActivityStore.js';
 import { getDevSeedListings, findDevSeedListing } from '../store/DevSeedListings.js';
 import { getMissingChainConfigKeys, getMissingNftConfigKeys, readinessErrorMessage } from '../config/readiness.js';
+import { env } from '../config/env.js';
 import { getListingState, getListingCount } from '../market/EscrowManager.js';
 import { getTokenOwner, getTokenURI, getBalanceOf } from '../nft/TokenIndexer.js';
 import { isRegisteredAgent } from '../agents/AgentRegistry.js';
@@ -19,6 +20,8 @@ import { getProvider } from '../providers/ProviderManager.js';
 // ── Routes ──
 
 export const publicRoutes = new Hono();
+const ALLOW_DEV_SEED_LISTINGS = process.env.ALLOW_DEV_SEED_LISTINGS === '1'
+    || (env.network === 'regtest' && process.env.ALLOW_DEV_SEED_LISTINGS !== '0');
 
 function sortListings(listings: Listing[], sort: string): void {
     switch (sort) {
@@ -144,7 +147,7 @@ publicRoutes.get('/listings', async (c) => {
         }
 
         // Dev fallback: when chain has no data, serve seeded listings.
-        if (listings.length === 0) {
+        if (ALLOW_DEV_SEED_LISTINGS && listings.length === 0) {
             listings.push(...getDevSeedListings());
         }
 
@@ -231,7 +234,7 @@ publicRoutes.get('/listing/:id', async (c) => {
             }
         }
 
-        if (!listing) {
+        if (!listing && ALLOW_DEV_SEED_LISTINGS) {
             listing = findDevSeedListing(id);
         }
         if (!listing) {
