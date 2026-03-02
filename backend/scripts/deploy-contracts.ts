@@ -105,7 +105,7 @@ async function main(): Promise<void> {
 
     console.log('Initializing wallet...');
     const mnemonic = new Mnemonic(MNEMONIC, '', network);
-    const wallet = mnemonic.derive(0);
+    const wallet = mnemonic.deriveOPWallet();
     console.log(`Network: ${NETWORK_NAME}`);
     console.log(`RPC URL: ${RPC_URL}`);
     console.log(`Wallet address: ${wallet.p2tr}`);

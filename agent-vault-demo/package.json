@@ -1,0 +1,23 @@
+{
+  "name": "agent-vault-demo",
+  "version": "1.0.0",
+  "description": "Demo scripts for AI agents to join EasyWeb3 AgentVault — the AI-native NFT marketplace on Bitcoin L1",
+  "type": "module",
+  "scripts": {
+    "join": "node join-agentvault.mjs",
+    "step1": "node step1-generate-wallet.js",
+    "step2": "node step2-deploy-collection.js",
+    "step3": "node step3-register.js",
+    "step4": "node step4-check-balance.js",
+    "step5": "node step5-mint.js",
+    "step6": "node step6-list.js",
+    "step7": "node step7-buy.js",
+    "step8": "node step8-cancel.js"
+  },
+  "keywords": ["opnet", "bitcoin", "nft", "ai-agent", "ml-dsa", "agentvault"],
+  "license": "MIT",
+  "dependencies": {
+    "@btc-vision/bitcoin": "^7.0.0-rc.6",
+    "@btc-vision/transaction": "^1.8.0-rc.10"
+  }
+}

@@ -1,4 +1,5 @@
 import { getMarketplaceContract } from '../providers/ContractCache.js';
+import { resolveAddress, setContractSender } from '../providers/AddressResolver.js';
 import { getWalletAddress } from '../agents/AgentWallet.js';
 import { executeTx } from './TxExecutor.js';
 
@@ -32,15 +33,18 @@ export async function listNFT(
     auctionDuration: number = 0,
 ): Promise<ListingResult> {
     const walletAddr = getWalletAddress();
-    const contract = getMarketplaceContract(walletAddr);
+    const contract = await getMarketplaceContract(walletAddr);
+    await setContractSender(contract, walletAddr);
     const listNFTFn = (contract as unknown as Record<string, ContractMethod>).listNFT;
     if (!listNFTFn) {
         throw new Error('listNFT method not found on contract');
     }
 
+    const nftContract = await resolveAddress(nftContractAddress, true);
+
     // Simulate listNFT
     const simulation = await listNFTFn(
-        nftContractAddress,
+        nftContract,
         BigInt(tokenId),
         BigInt(price),
         BigInt(auctionDuration),
@@ -68,7 +72,8 @@ export async function buyNow(
     price: string,
 ): Promise<BuyResult> {
     const walletAddr = getWalletAddress();
-    const contract = getMarketplaceContract(walletAddr);
+    const contract = await getMarketplaceContract(walletAddr);
+    await setContractSender(contract, walletAddr);
     const methods = contract as unknown as Record<string, ContractMethod | ((...args: unknown[]) => void)>;
 
     // Set transaction details BEFORE simulate for BTC payment
@@ -115,7 +120,8 @@ export async function placeBid(
     bidAmount: string,
 ): Promise<BidResult> {
     const walletAddr = getWalletAddress();
-    const contract = getMarketplaceContract(walletAddr);
+    const contract = await getMarketplaceContract(walletAddr);
+    await setContractSender(contract, walletAddr);
     const placeBidFn = (contract as unknown as Record<string, ContractMethod>).placeBid;
     if (!placeBidFn) {
         throw new Error('placeBid method not found on contract');
@@ -136,7 +142,8 @@ export async function placeBid(
  */
 export async function cancelListing(listingId: string): Promise<CancelResult> {
     const walletAddr = getWalletAddress();
-    const contract = getMarketplaceContract(walletAddr);
+    const contract = await getMarketplaceContract(walletAddr);
+    await setContractSender(contract, walletAddr);
     const cancelListingFn = (contract as unknown as Record<string, ContractMethod>).cancelListing;
     if (!cancelListingFn) {
         throw new Error('cancelListing method not found on contract');

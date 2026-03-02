@@ -194,7 +194,7 @@ export function deployCollection(
   req: DeployCollectionRequest,
   auth: AgentRequestAuth,
 ): Promise<DeployCollectionResponse> {
-  return agentRequest("/agent/deploy-collection", req, auth);
+  return agentRequest("/agent/create-collection", req, auth);
 }
 
 export interface WalletSignatureResult {

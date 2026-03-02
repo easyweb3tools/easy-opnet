@@ -12,11 +12,33 @@ import { query as queryActivity, getEventsByAgent } from '../store/ActivityStore
 import { getDevSeedListings, findDevSeedListing } from '../store/DevSeedListings.js';
 import { getMissingChainConfigKeys, getMissingNftConfigKeys, readinessErrorMessage } from '../config/readiness.js';
 import { env } from '../config/env.js';
+import { CONTRACT_ADDRESSES } from '../config/contracts.js';
+import { getNetwork } from '../config/network.js';
 import { getListingState, getListingCount } from '../market/EscrowManager.js';
-import { getTokenOwner, getTokenURI, getBalanceOf } from '../nft/TokenIndexer.js';
+import {
+    getTokenOwner,
+    getTokenURI,
+    getBalanceOf,
+    getTokenOfOwnerByIndex,
+} from '../nft/TokenIndexer.js';
 import { getAgentsByOwner, isRegisteredAgent } from '../agents/AgentRegistry.js';
+import { normalizeAgentAddress } from '../agents/AddressValidator.js';
 import { getProvider } from '../providers/ProviderManager.js';
-import { getCollectionByCreatorAgent } from '../store/CollectionStore.js';
+import {
+    getImportedCollection,
+    getImportedCollectionsByAgent,
+    getAgentsByImportedContract,
+    getAgentCollectionContractAddress,
+    getAgentCollectionId,
+    getAgentOwnerAddress,
+    getAgentPublicKey,
+    getCollectionByCreatorAgent,
+    listCollectionsByCreatorAgent,
+    ImportedCollectionRecord,
+} from '../store/CollectionStore.js';
+import { resolveAddressWithPublicKey } from '../providers/AddressResolver.js';
+import { getContract, ABIDataTypes, BitcoinAbiTypes } from 'opnet';
+import type { BitcoinInterfaceAbi } from 'opnet';
 import { resolveDefaultCollectionContract } from '../nft/CollectionResolver.js';
 
 // ── Routes ──
@@ -27,6 +49,117 @@ const ALLOW_DEV_SEED_LISTINGS = process.env.ALLOW_DEV_SEED_LISTINGS === '1'
 
 function shouldRequireChainReadiness(): boolean {
     return !ALLOW_DEV_SEED_LISTINGS;
+}
+
+const F = BitcoinAbiTypes.Function;
+const OP721_METADATA_ABI: BitcoinInterfaceAbi = [
+    {
+        name: 'name',
+        type: F,
+        inputs: [],
+        outputs: [{ name: 'name', type: ABIDataTypes.STRING }],
+    },
+    {
+        name: 'symbol',
+        type: F,
+        inputs: [],
+        outputs: [{ name: 'symbol', type: ABIDataTypes.STRING }],
+    },
+    {
+        name: 'totalSupply',
+        type: F,
+        inputs: [],
+        outputs: [{ name: 'totalSupply', type: ABIDataTypes.UINT256 }],
+    },
+];
+
+function normalizeContractAddress(address: string): string {
+    return address.trim().toLowerCase();
+}
+
+interface MetadataResult {
+    decoded?: Record<string, unknown>;
+    result?: unknown;
+}
+
+type MetadataMethod = () => Promise<MetadataResult>;
+
+function decodeStringField(result: MetadataResult, key: string): string | undefined {
+    if (result.decoded && typeof result.decoded[key] === 'string') {
+        return result.decoded[key] as string;
+    }
+    if (result.result && typeof result.result === 'string') {
+        return result.result;
+    }
+    return undefined;
+}
+
+function decodeUintField(result: MetadataResult, key: string): bigint | undefined {
+    if (result.decoded && result.decoded[key] != null) {
+        return BigInt(String(result.decoded[key]));
+    }
+    if (result.result != null) {
+        return BigInt(String(result.result));
+    }
+    return undefined;
+}
+
+async function loadCollectionMetadata(contractAddress: string): Promise<{
+    name?: string;
+    symbol?: string;
+    totalSupply?: number;
+}> {
+    try {
+        const provider = getProvider();
+        const resolved = await resolveAddressWithPublicKey(contractAddress, true);
+        const contract = getContract(
+            resolved,
+            OP721_METADATA_ABI,
+            provider,
+            getNetwork(env.network),
+        );
+
+        const metadataContract = contract as unknown as Record<string, MetadataMethod>;
+        const nameFn = metadataContract.name;
+        const symbolFn = metadataContract.symbol;
+        const totalSupplyFn = metadataContract.totalSupply;
+
+        const metadata: {
+            name?: string;
+            symbol?: string;
+            totalSupply?: number;
+        } = {};
+
+        if (nameFn) {
+            const result = await nameFn();
+            const value = decodeStringField(result, 'name');
+            if (value) {
+                metadata.name = value;
+            }
+        }
+
+        if (symbolFn) {
+            const result = await symbolFn();
+            const value = decodeStringField(result, 'symbol');
+            if (value) {
+                metadata.symbol = value;
+            }
+        }
+
+        if (totalSupplyFn) {
+            const result = await totalSupplyFn();
+            const value = decodeUintField(result, 'totalSupply');
+            if (value !== undefined) {
+                metadata.totalSupply = value > BigInt(Number.MAX_SAFE_INTEGER)
+                    ? Number.MAX_SAFE_INTEGER
+                    : Number(value);
+            }
+        }
+
+        return metadata;
+    } catch {
+        return {};
+    }
 }
 
 function sortListings(listings: Listing[], sort: string): void {
@@ -345,17 +478,36 @@ publicRoutes.get('/agent/:address', async (c) => {
     }
 
     try {
-        const collection = await getCollectionByCreatorAgent(address);
-        if (!collection) {
+        const storedCollection = await getCollectionByCreatorAgent(address);
+        const [fallbackContractAddress, fallbackCollectionId] = storedCollection
+            ? [null, null]
+            : await Promise.all([
+                getAgentCollectionContractAddress(address),
+                getAgentCollectionId(address),
+            ]);
+        const collectionContractAddress = storedCollection?.contractAddress ?? fallbackContractAddress;
+        const collectionId = storedCollection?.collectionId ?? fallbackCollectionId;
+        if (!collectionContractAddress) {
             return c.json({ success: false, error: 'Agent not found (no deployed collection)' }, 404);
         }
 
-        const [registered, balance] = await Promise.all([
-            isRegisteredAgent(address, collection.contractAddress),
-            getBalanceOf(address, collection.contractAddress),
+        const storedAgentPublicKey = await getAgentPublicKey(address);
+        const [registered, balance, storedOwner] = await Promise.all([
+            isRegisteredAgent(
+                address,
+                collectionContractAddress,
+                storedAgentPublicKey ?? storedCollection?.creatorAgentPublicKey,
+            ),
+            getBalanceOf(
+                address,
+                collectionContractAddress,
+                storedAgentPublicKey ?? storedCollection?.creatorAgentPublicKey,
+                collectionId ?? undefined,
+            ),
+            getAgentOwnerAddress(address),
         ]);
 
-        if (!registered) {
+        if (!registered && !storedOwner) {
             return c.json({ success: false, error: 'Agent not found' }, 404);
         }
 
@@ -371,9 +523,9 @@ publicRoutes.get('/agent/:address', async (c) => {
             address,
             name: '',
             avatar: '',
-            publicKey: '',
+            publicKey: storedAgentPublicKey ?? storedCollection?.creatorAgentPublicKey ?? '',
             registeredAt: '',
-            status: 'active' as const,
+            status: registered ? 'active' as const : 'inactive' as const,
             stats: {
                 minted,
                 trades,
@@ -382,16 +534,24 @@ publicRoutes.get('/agent/:address', async (c) => {
             },
         };
 
-        // Get agent's NFTs (look through activity for minted tokenIds)
-        const mintedTokenIds = agentEvents
-            .filter((e) => e.type === 'mint' && e.tokenId)
-            .map((e) => e.tokenId!);
-
+        // Get agent NFTs directly from chain state for better eventual consistency.
         const nfts: NFT[] = [];
-        for (const tokenId of mintedTokenIds) {
+        const normalizedHubAddress = CONTRACT_ADDRESSES.nftHub.trim().toLowerCase();
+        const isHubCollection = normalizedHubAddress
+            && collectionContractAddress.trim().toLowerCase() === normalizedHubAddress;
+        const maxNftsToFetch = isHubCollection ? 0 : Number(balance > 50n ? 50n : balance);
+        for (let i = 0; i < maxNftsToFetch; i += 1) {
+            const tokenId = await getTokenOfOwnerByIndex(
+                address,
+                BigInt(i),
+                collectionContractAddress,
+                storedAgentPublicKey ?? storedCollection?.creatorAgentPublicKey,
+            );
+            if (!tokenId) continue;
+
             const [owner, tokenUri] = await Promise.all([
-                getTokenOwner(tokenId, collection.contractAddress),
-                getTokenURI(tokenId, collection.contractAddress),
+                getTokenOwner(tokenId, collectionContractAddress),
+                getTokenURI(tokenId, collectionContractAddress),
             ]);
             if (owner) {
                 nfts.push({
@@ -452,6 +612,61 @@ publicRoutes.get('/agent/:address', async (c) => {
     } catch (err) {
         console.error('Failed to fetch agent:', err);
         return c.json({ success: false, error: 'Failed to fetch agent' }, 500);
+    }
+});
+
+publicRoutes.get('/collection/:address', async (c) => {
+    const contractParam = c.req.param('address');
+    const contractAddress = normalizeContractAddress(contractParam);
+
+    try {
+        const platformCollection = await getCollectionByCreatorAgent(contractAddress);
+        const importedAgents = await getAgentsByImportedContract(contractAddress);
+        const importedRecords = (await Promise.all(
+            importedAgents.map((agent) => getImportedCollection(agent, contractAddress)),
+        )).filter((entry): entry is ImportedCollectionRecord => Boolean(entry));
+        const metadata = await loadCollectionMetadata(contractAddress);
+
+        const response = {
+            contractAddress,
+            name: platformCollection?.name
+                ?? metadata.name
+                ?? importedRecords[0]?.name
+                ?? '',
+            symbol: platformCollection?.symbol
+                ?? metadata.symbol
+                ?? importedRecords[0]?.symbol
+                ?? '',
+            source: platformCollection ? 'platform' : 'imported',
+            importedBy: Array.from(new Set(importedAgents)),
+            totalSupply: metadata.totalSupply ?? 0,
+        };
+
+        return c.json({ success: true, data: response });
+    } catch (err) {
+        console.error('Failed to fetch collection:', err);
+        return c.json({ success: false, error: 'Failed to fetch collection' }, 500);
+    }
+});
+
+publicRoutes.get('/agent/:address/collections', async (c) => {
+    const address = c.req.param('address');
+    const normalized = normalizeAgentAddress(address);
+
+    try {
+        const platformCollections = await listCollectionsByCreatorAgent(normalized);
+        const imported = await getImportedCollectionsByAgent(normalized);
+
+        return c.json({
+            success: true,
+            data: {
+                platform: platformCollections,
+                imported,
+            },
+        });
+    } catch (err) {
+        console.error('Failed to fetch agent collections:', err);
+        return c.json({ success: false, error: 'Failed to fetch agent collections' }, 500);
     }
 });
 

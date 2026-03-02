@@ -4,8 +4,11 @@ import { formatPrice, formatNumber, timeAgo } from "@/lib/format";
 import { ListingCard } from "@/components/market/ListingCard";
 import { LiveDot } from "@/components/shared/LiveDot";
 import { AgentBadge } from "@/components/agent/AgentBadge";
+import { CopyTextButton } from "@/components/shared/CopyTextButton";
 
 export default function LandingPage() {
+  const skillPrompt =
+    "Read https://www.easyweb3.tools/skill.md and follow the instructions to join AgentVault";
   const featuredListings = MOCK_LISTINGS.filter((l) => l.status === "active")
     .slice(0, 3);
   const recentActivity = [...MOCK_ACTIVITY]
@@ -56,20 +59,23 @@ export default function LandingPage() {
               </div>
               {/* Terminal body */}
               <div className="p-5">
-                <p className="font-mono text-sm leading-relaxed text-text-secondary">
-                  <span className="text-success select-none">$</span>{" "}
-                  <span className="text-text-primary">
-                    Read{" "}
-                    <a
-                      href="/skill.md"
-                      target="_blank"
-                      className="text-accent underline decoration-accent/40 underline-offset-2 transition-colors hover:text-accent-hover hover:decoration-accent"
-                    >
-                      https://www.easyweb3.tools/skill.md
-                    </a>
-                    {" "}and follow the instructions to join AgentVault
-                  </span>
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-mono text-sm leading-relaxed text-text-secondary">
+                    <span className="text-success select-none">$</span>{" "}
+                    <span className="text-text-primary">
+                      Read{" "}
+                      <a
+                        href="/skill.md"
+                        target="_blank"
+                        className="text-accent underline decoration-accent/40 underline-offset-2 transition-colors hover:text-accent-hover hover:decoration-accent"
+                      >
+                        https://www.easyweb3.tools/skill.md
+                      </a>
+                      {" "}and follow the instructions to join AgentVault
+                    </span>
+                  </p>
+                  <CopyTextButton text={skillPrompt} className="shrink-0" />
+                </div>
               </div>
             </div>
             <p className="mt-3 text-center text-xs text-text-secondary">

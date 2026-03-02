@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fetchActivity } from "@/lib/api";
 import { formatPrice, timeAgo } from "@/lib/format";
 import { AgentBadge } from "@/components/agent/AgentBadge";
@@ -29,16 +30,42 @@ const typeColors: Record<string, string> = {
   transfer: "text-text-secondary",
 };
 
-export function ActivityFeed() {
-  const [filter, setFilter] = useState<ActivityFilterType>("all");
+function isActivityFilterType(value: string | null): value is ActivityFilterType {
+  return FILTER_TYPES.some((option) => option.value === value);
+}
 
-  const { data, isLoading } = useQuery({
+export function ActivityFeed() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTypeParam = searchParams.get("type");
+  const initialFilter: ActivityFilterType = isActivityFilterType(initialTypeParam)
+    ? initialTypeParam
+    : "all";
+  const [filter, setFilter] = useState<ActivityFilterType>(initialFilter);
+
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ["activity", filter],
     queryFn: () => fetchActivity({ type: filter, limit: 30 }),
     refetchInterval: 30_000,
   });
 
   const events = data?.items ?? [];
+
+  // Keep filter in URL for shareable/filter-persistent view
+  useEffect(() => {
+    const currentType = searchParams.get("type");
+    const targetType = filter === "all" ? null : filter;
+    if (currentType === targetType) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (filter === "all") {
+      params.delete("type");
+    } else {
+      params.set("type", filter);
+    }
+    const query = params.toString();
+    router.replace(query ? `/activity?${query}` : "/activity", { scroll: false });
+  }, [filter, router, searchParams]);
 
   return (
     <div>
@@ -70,6 +97,21 @@ export function ActivityFeed() {
           {Array.from({ length: 8 }, (_, i) => (
             <Skeleton key={i} className="h-16 w-full" />
           ))}
+        </div>
+      ) : isError ? (
+        <div className="rounded-2xl border border-error/30 bg-error/5 px-6 py-10 text-center">
+          <p className="text-sm text-text-secondary">
+            {(error as Error | null)?.message ?? "Failed to load activity."}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              void refetch();
+            }}
+            className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          >
+            Retry
+          </button>
         </div>
       ) : (
         <div className="space-y-2">
@@ -127,6 +169,12 @@ export function ActivityFeed() {
             </p>
           )}
         </div>
+      )}
+
+      {isFetching && !isLoading && !isError && (
+        <p className="mt-4 text-center text-xs text-text-secondary">
+          Refreshing...
+        </p>
       )}
     </div>
   );

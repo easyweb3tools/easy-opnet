@@ -8,21 +8,105 @@ import type {
     BuyRequest,
     CancelRequest,
     DeployCollectionRequest,
+    ImportCollectionRequest,
+    ImportCollectionResponse,
 } from '../types/index.js';
 import { registerAgentOnChain } from '../agents/AgentRegistry.js';
 import { verifyAgentSignature } from '../agents/AgentAuthService.js';
 import { isValidAgentAddress, normalizeAgentAddress } from '../agents/AddressValidator.js';
 import {
     getMissingChainConfigKeys,
+    getMissingHubConfigKeys,
     getMissingWalletConfigKeys,
     readinessErrorMessage,
 } from '../config/readiness.js';
+import { env } from '../config/env.js';
+import { getNetwork } from '../config/network.js';
 import { mintNFT } from '../nft/MintService.js';
-import { deployCollection } from '../nft/DeployService.js';
-import { resolveCollectionContractForAgent } from '../nft/CollectionResolver.js';
+import {
+    resolveCollectionContractForAgent,
+    resolveCollectionForAgent,
+} from '../nft/CollectionResolver.js';
+import { getTokenOwner } from '../nft/TokenIndexer.js';
 import { listNFT, buyNow, placeBid, cancelListing } from '../market/MarketService.js';
 import { getListingState } from '../market/EscrowManager.js';
+import { CONTRACT_ADDRESSES } from '../config/contracts.js';
 import { record } from '../store/ActivityStore.js';
+import { createCollection } from '../nft/CollectionService.js';
+import {
+    saveImportedCollection,
+    getImportedCollection,
+    countImportedCollections,
+} from '../store/CollectionStore.js';
+import type { BitcoinInterfaceAbi } from 'opnet';
+import { getProvider } from '../providers/ProviderManager.js';
+import { resolveAddressWithPublicKey } from '../providers/AddressResolver.js';
+import { getContract, ABIDataTypes, BitcoinAbiTypes } from 'opnet';
+
+const F = BitcoinAbiTypes.Function;
+const OP721_PROBE_ABI: BitcoinInterfaceAbi = [
+    {
+        name: 'balanceOf',
+        type: F,
+        inputs: [{ name: 'owner', type: ABIDataTypes.ADDRESS }],
+        outputs: [{ name: 'balance', type: ABIDataTypes.UINT256 }],
+    },
+    {
+        name: 'ownerOf',
+        type: F,
+        inputs: [{ name: 'tokenId', type: ABIDataTypes.UINT256 }],
+        outputs: [{ name: 'owner', type: ABIDataTypes.ADDRESS }],
+    },
+];
+
+function normalizeContractAddress(address: string): string {
+    return address.trim().toLowerCase();
+}
+
+interface ContractCallResult {
+    decoded?: Record<string, unknown>;
+    result?: unknown;
+    error?: string;
+}
+
+type ContractMethod = (...args: unknown[]) => Promise<ContractCallResult>;
+
+function parseBalance(result: ContractCallResult): bigint {
+    const rawValue = result.decoded?.balance ?? result.result ?? '0';
+    return BigInt(String(rawValue ?? '0'));
+}
+
+async function probeImportedContract(
+    contractAddress: string,
+    agentAddress: string,
+    agentPublicKey?: string,
+): Promise<{ resolved: string; balance: bigint }> {
+    const provider = getProvider();
+    const resolved = await resolveAddressWithPublicKey(contractAddress, true);
+    await provider.getCode(contractAddress, false);
+
+    const contract = getContract(
+        resolved,
+        OP721_PROBE_ABI,
+        provider,
+        getNetwork(env.network),
+    );
+
+    const balanceOfFn = (contract as unknown as Record<string, ContractMethod>).balanceOf;
+    if (!balanceOfFn) {
+        throw new Error('balanceOf method not found on contract');
+    }
+
+    const agent = await resolveAddressWithPublicKey(agentAddress, false, agentPublicKey);
+    const balanceResult = await balanceOfFn(agent);
+    if (balanceResult.error) {
+        throw new Error('Contract does not implement balanceOf/ownerOf');
+    }
+
+    const balance = parseBalance(balanceResult);
+    const normalizedResolved = normalizeContractAddress(resolved.toString());
+    return { resolved: normalizedResolved, balance };
+}
 
 type AgentEnv = { Variables: { agentAddress: string; agentPublicKey: string } };
 
@@ -52,6 +136,16 @@ function requireWalletReady(c: Context): Response | null {
     );
 }
 
+function requireHubReady(c: Context): Response | null {
+    const missing = getMissingHubConfigKeys();
+    if (missing.length === 0) return null;
+
+    return c.json(
+        { success: false, error: readinessErrorMessage(missing) },
+        503,
+    );
+}
+
 // POST /api/agent/register
 agentRoutes.post('/register', async (c) => {
     const readinessError = requireWalletReady(c);
@@ -64,6 +158,10 @@ agentRoutes.post('/register', async (c) => {
         ownerAddress?: string;
         ownerPublicKey?: string;
         ownerSignature?: string;
+        collectionContractAddress?: string;
+        collectionContractPublicKey?: string;
+        collectionDeploymentTxHash?: string;
+        collectionId?: string;
     };
     const verifiedPublicKey = (c.get('agentPublicKey') as string | undefined) ?? '';
     const signedAgentAddress = (c.get('agentAddress') as string | undefined) ?? '';
@@ -123,6 +221,13 @@ agentRoutes.post('/register', async (c) => {
             agentAddress,
             ownerAddress,
             ownerVerification.normalizedPublicKey,
+            cleanVerifiedKey || cleanBodyKey,
+            {
+                contractAddress: body.collectionContractAddress,
+                contractPublicKey: body.collectionContractPublicKey,
+                deploymentTxHash: body.collectionDeploymentTxHash,
+                collectionId: body.collectionId,
+            },
         );
 
         const response: AgentActionResponse = { txHash };
@@ -133,13 +238,13 @@ agentRoutes.post('/register', async (c) => {
     }
 });
 
-// POST /api/agent/deploy-collection
-agentRoutes.post('/deploy-collection', async (c) => {
-    const readinessError = requireWalletReady(c);
+async function handleCreateCollection(c: Context): Promise<Response> {
+    const readinessError = requireHubReady(c);
     if (readinessError) return readinessError;
 
     const body = await c.req.json() as DeployCollectionRequest;
     const agentAddress = c.get('agentAddress');
+    const verifiedPublicKey = (c.get('agentPublicKey') as string | undefined) ?? '';
 
     if (!body.address || !body.name || !body.symbol || !body.maxSupply) {
         return c.json(
@@ -165,9 +270,25 @@ agentRoutes.post('/deploy-collection', async (c) => {
         return c.json({ success: false, error: 'maxSupply must be greater than zero' }, 400);
     }
 
+    if (body.publicKey && verifiedPublicKey) {
+        const cleanBodyKey = body.publicKey.startsWith('0x')
+            ? body.publicKey.slice(2).toLowerCase()
+            : body.publicKey.toLowerCase();
+        const cleanVerifiedKey = verifiedPublicKey.startsWith('0x')
+            ? verifiedPublicKey.slice(2).toLowerCase()
+            : verifiedPublicKey.toLowerCase();
+        if (cleanBodyKey !== cleanVerifiedKey) {
+            return c.json(
+                { success: false, error: 'publicKey in body does not match signed header key' },
+                403,
+            );
+        }
+    }
+
     try {
-        const result = await deployCollection({
+        const result = await createCollection({
             address: body.address,
+            publicKey: verifiedPublicKey || body.publicKey,
             name,
             symbol,
             maxSupply: body.maxSupply,
@@ -183,15 +304,109 @@ agentRoutes.post('/deploy-collection', async (c) => {
             agent: agentAddress,
             tokenId: '',
             nftName: name,
-            txHash: result.deploymentTxHash,
+            txHash: result.txHash ?? result.deploymentTxHash,
         });
 
         return c.json({ success: true, data: result });
     } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Deployment failed';
+        const msg = err instanceof Error ? err.message : 'Create collection failed';
         return c.json({ success: false, error: msg }, 500);
     }
-});
+}
+
+// POST /api/agent/create-collection
+agentRoutes.post('/create-collection', handleCreateCollection);
+
+// POST /api/agent/deploy-collection (backward compatibility alias)
+agentRoutes.post('/deploy-collection', handleCreateCollection);
+
+async function handleImportCollection(c: Context): Promise<Response> {
+    const readinessError = requireWalletReady(c);
+    if (readinessError) return readinessError;
+
+    const body = await c.req.json() as ImportCollectionRequest;
+    const agentAddress = c.get('agentAddress');
+    const verifiedPublicKey = (c.get('agentPublicKey') as string | undefined) ?? '';
+
+    if (!body.address || !body.nftContractAddress) {
+        return c.json(
+            { success: false, error: 'address and nftContractAddress are required' },
+            400,
+        );
+    }
+
+    if (!agentAddress || normalizeAgentAddress(body.address) !== agentAddress) {
+        return c.json({ success: false, error: 'Signed agent address mismatch' }, 403);
+    }
+
+    const normalizedAgent = normalizeAgentAddress(body.address);
+    const normalizedContract = normalizeContractAddress(body.nftContractAddress);
+    const normalizedHub = normalizeContractAddress(CONTRACT_ADDRESSES.nftHub);
+    if (normalizedHub && normalizedContract === normalizedHub) {
+        return c.json(
+            {
+                success: false,
+                error: 'Use /api/agent/create-collection to work with the platform collection',
+            },
+            400,
+        );
+    }
+
+    const existingCount = await countImportedCollections(normalizedAgent);
+    if (existingCount >= 10) {
+        return c.json(
+            { success: false, error: 'Import limit reached (max 10 collections)' },
+            429,
+        );
+    }
+
+    try {
+        const { resolved, balance } = await probeImportedContract(
+            normalizedContract,
+            normalizedAgent,
+            verifiedPublicKey || undefined,
+        );
+
+        if (balance <= 0n) {
+            return c.json(
+                { success: false, error: 'Agent must own at least one token on this contract' },
+                400,
+            );
+        }
+
+        const record = await saveImportedCollection({
+            id: '',
+            agentAddress: normalizedAgent,
+            nftContractAddress: resolved,
+            name: body.name?.trim() ?? '',
+            symbol: body.symbol?.trim() ?? '',
+            collectionBanner: body.collectionBanner?.trim() ?? '',
+            collectionIcon: body.collectionIcon?.trim() ?? '',
+            collectionWebsite: body.collectionWebsite?.trim() ?? '',
+            collectionDescription: body.collectionDescription?.trim() ?? '',
+            verified: true,
+            importedAt: new Date().toISOString(),
+        });
+
+        const tokenCount = balance > BigInt(Number.MAX_SAFE_INTEGER)
+            ? Number.MAX_SAFE_INTEGER
+            : Number(balance);
+
+        const response: ImportCollectionResponse = {
+            collectionId: record.id,
+            nftContractAddress: resolved,
+            verified: true,
+            tokenCount,
+        };
+
+        return c.json({ success: true, data: response });
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Import failed';
+        return c.json({ success: false, error: msg }, 400);
+    }
+}
+
+agentRoutes.post('/import-collection', handleImportCollection);
 
 // POST /api/agent/mint
 agentRoutes.post('/mint', async (c) => {
@@ -200,36 +415,47 @@ agentRoutes.post('/mint', async (c) => {
 
     const body = await c.req.json() as MintRequest;
     const agentAddress = c.get('agentAddress');
+    const verifiedPublicKey = (c.get('agentPublicKey') as string | undefined) ?? '';
 
     if (!body.metadata?.name || !body.metadata?.description) {
         return c.json({ success: false, error: 'Metadata name and description are required' }, 400);
     }
 
     try {
-        const nftContractAddress = await resolveCollectionContractForAgent(agentAddress);
+        const resolvedCollection = await resolveCollectionForAgent(
+            agentAddress,
+            {
+                contractAddress: body.collectionContractAddress,
+                contractPublicKey: body.collectionContractPublicKey,
+                deploymentTxHash: body.collectionDeploymentTxHash,
+                collectionId: body.collectionId,
+            },
+        );
+        const nftContractAddress = resolvedCollection.contractAddress;
         const recipient = body.recipient ?? agentAddress;
+        const recipientPublicKey = body.recipientPublicKey ?? (body.recipient ? undefined : verifiedPublicKey);
         const result = await mintNFT(nftContractAddress, recipient, {
             name: body.metadata.name,
             description: body.metadata.description,
             imageUrl: body.metadata.imageUrl ?? '',
             attributes: body.metadata.attributes ?? [],
-        });
+        }, recipientPublicKey, resolvedCollection.collectionId);
 
         record({
             type: 'mint',
             agent: agentAddress,
-            tokenId: result.tokenId,
+            tokenId: result.tokenId ?? '',
             nftName: body.metadata.name,
             txHash: result.txHash,
         });
 
-        let response: AgentActionResponse = {
-            txHash: result.txHash,
-            tokenId: result.tokenId,
-        };
+        let response: AgentActionResponse = { txHash: result.txHash };
+        if (result.tokenId) {
+            response = { ...response, tokenId: result.tokenId };
+        }
 
         // If listImmediately, also list the NFT
-        if (body.listImmediately && body.listPrice) {
+        if (body.listImmediately && body.listPrice && result.tokenId) {
             try {
                 const listResult = await listNFT(
                     nftContractAddress,
@@ -249,6 +475,8 @@ agentRoutes.post('/mint', async (c) => {
             } catch (listErr) {
                 console.error('Auto-list after mint failed:', listErr);
             }
+        } else if (body.listImmediately && !result.tokenId) {
+            console.warn('Skipping auto-list: tokenId not indexed yet for newly minted NFT');
         }
 
         return c.json({ success: true, data: response });
@@ -275,7 +503,31 @@ agentRoutes.post('/list', async (c) => {
     }
 
     try {
-        const nftContractAddress = await resolveCollectionContractForAgent(agentAddress);
+        let nftContractAddress: string;
+        if (body.nftContractAddress) {
+            const normalizedContract = normalizeContractAddress(body.nftContractAddress);
+            const imported = await getImportedCollection(agentAddress, normalizedContract);
+            if (!imported) {
+                return c.json(
+                    {
+                        success: false,
+                        error: 'Collection not imported. Call /api/agent/import-collection first.',
+                    },
+                    400,
+                );
+            }
+            nftContractAddress = imported.nftContractAddress;
+        } else {
+            nftContractAddress = await resolveCollectionContractForAgent(agentAddress);
+        }
+
+        const owner = await getTokenOwner(body.tokenId, nftContractAddress);
+        if (!owner || normalizeAgentAddress(owner) !== agentAddress) {
+            return c.json(
+                { success: false, error: 'Agent does not own this token' },
+                403,
+            );
+        }
         const result = await listNFT(
             nftContractAddress,
             body.tokenId,

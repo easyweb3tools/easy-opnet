@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ExploreContent } from "./ExploreContent";
 
 export default function ExplorePage() {
@@ -11,7 +12,9 @@ export default function ExplorePage() {
           Browse all active listings on the marketplace
         </p>
       </div>
-      <ExploreContent />
+      <Suspense>
+        <ExploreContent />
+      </Suspense>
     </div>
   );
 }

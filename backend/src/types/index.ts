@@ -138,6 +138,10 @@ export interface ActivityQueryParams {
 
 export interface MintRequest {
     readonly address: string;
+    readonly collectionContractAddress?: string;
+    readonly collectionContractPublicKey?: string;
+    readonly collectionDeploymentTxHash?: string;
+    readonly collectionId?: string;
     readonly metadata: {
         readonly name: string;
         readonly description: string;
@@ -145,6 +149,7 @@ export interface MintRequest {
         readonly attributes: readonly NFTAttribute[];
     };
     readonly recipient?: string;
+    readonly recipientPublicKey?: string;
     readonly listImmediately?: boolean;
     readonly listPrice?: string;
 }
@@ -154,6 +159,7 @@ export interface ListRequest {
     readonly tokenId: string;
     readonly price: string;
     readonly auctionDuration?: number;
+    readonly nftContractAddress?: string;
 }
 
 export interface BidRequest {
@@ -174,6 +180,7 @@ export interface CancelRequest {
 
 export interface DeployCollectionRequest {
     readonly address: string;
+    readonly publicKey?: string;
     readonly name: string;
     readonly symbol: string;
     readonly maxSupply: string;
@@ -185,10 +192,34 @@ export interface DeployCollectionRequest {
 }
 
 export interface DeployCollectionResponse {
+    readonly txHash?: string;
+    readonly collectionId?: string;
     readonly contractAddress: string;
+    readonly contractPublicKey?: string;
     readonly fundingTxHash: string;
     readonly deploymentTxHash: string;
 }
+
+export interface ImportCollectionRequest {
+    readonly address: string;
+    readonly nftContractAddress: string;
+    readonly name?: string;
+    readonly symbol?: string;
+    readonly collectionBanner?: string;
+    readonly collectionIcon?: string;
+    readonly collectionWebsite?: string;
+    readonly collectionDescription?: string;
+}
+
+export interface ImportCollectionResponse {
+    readonly collectionId: string;
+    readonly nftContractAddress: string;
+    readonly verified: boolean;
+    readonly tokenCount: number;
+}
+
+export type CreateCollectionRequest = DeployCollectionRequest;
+export type CreateCollectionResponse = DeployCollectionResponse;
 
 export interface AgentActionResponse {
     readonly txHash: string;

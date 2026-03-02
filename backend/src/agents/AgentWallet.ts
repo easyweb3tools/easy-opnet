@@ -28,7 +28,7 @@ export function getAgentWallet(): AgentWalletInstance {
         network,
     );
 
-    const wallet = mnemonic.derive(0);
+    const wallet = mnemonic.deriveOPWallet();
 
     walletInstance = {
         keypair: wallet.keypair,

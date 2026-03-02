@@ -1,6 +1,8 @@
 import { getAgentWallet } from '../agents/AgentWallet.js';
+import { resolveWalletMldsaLinkState } from '../agents/MldsaLinkState.js';
 import { getNetwork } from '../config/network.js';
 import { env } from '../config/env.js';
+import { getProvider } from '../providers/ProviderManager.js';
 
 interface TxOptions {
     maximumAllowedSatToSpend?: bigint;
@@ -27,15 +29,18 @@ export async function executeTx(
 
     const wallet = getAgentWallet();
     const network = getNetwork(env.network);
+    const linkState = await resolveWalletMldsaLinkState(getProvider());
 
-    const sendFn = (simulation as Record<string, CallableFunction>).sendTransaction;
+    const simulationObject = simulation as Record<string, unknown>;
+    const sendFn = simulationObject.sendTransaction as ((params: Record<string, unknown>) => Promise<TxResult>) | undefined;
     if (typeof sendFn !== 'function') {
         throw new Error('Simulation result does not have sendTransaction method');
     }
 
-    const receipt = await sendFn({
+    const receipt = await sendFn.call(simulationObject, {
         signer: wallet.keypair,
         mldsaSigner: wallet.mldsaKeypair,
+        linkMLDSAPublicKeyToAddress: linkState.linkRequired,
         refundTo: wallet.p2tr,
         maximumAllowedSatToSpend: options.maximumAllowedSatToSpend ?? 50000n,
         network,

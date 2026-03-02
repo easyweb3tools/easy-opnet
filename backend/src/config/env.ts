@@ -22,7 +22,7 @@ function parseNetwork(raw: string): NetworkName {
 }
 
 export const env = {
-    network: parseNetwork(optionalEnv('OPNET_NETWORK', 'regtest')),
+    network: parseNetwork(optionalEnv('OPNET_NETWORK', 'testnet')),
 
     rpcUrls: {
         regtest: optionalEnv('OPNET_RPC_URL_REGTEST', 'https://regtest.opnet.org'),
@@ -32,6 +32,7 @@ export const env = {
 
     contracts: {
         marketplace: optionalEnv('MARKETPLACE_CONTRACT_ADDRESS', ''),
+        nftHub: optionalEnv('NFT_HUB_CONTRACT_ADDRESS', ''),
     },
 
     walletMnemonic: optionalEnv('WALLET_MNEMONIC', ''),

@@ -14,7 +14,7 @@ type ContractMethod = (...args: unknown[]) => Promise<ContractCallResult>;
 
 async function getAgentCountForCollection(nftContractAddress: string): Promise<number> {
     try {
-        const contract = getNftContract(getWalletAddress(), nftContractAddress);
+        const contract = await getNftContract(getWalletAddress(), nftContractAddress);
         const fn = (contract as unknown as Record<string, ContractMethod>).getAgentCount;
         if (!fn) return 0;
 

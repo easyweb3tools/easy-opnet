@@ -22,6 +22,7 @@ nftRoutes.post('/mint', async (c) => {
     try {
         const body = await c.req.json() as {
             nftContractAddress: string;
+            collectionId?: string;
             to: string;
             metadata: {
                 name: string;
@@ -35,7 +36,13 @@ nftRoutes.post('/mint', async (c) => {
             return c.json({ success: false, error: 'nftContractAddress, to address and metadata.name are required' }, 400);
         }
 
-        const result = await mintNFT(body.nftContractAddress, body.to, body.metadata);
+        const result = await mintNFT(
+            body.nftContractAddress,
+            body.to,
+            body.metadata,
+            undefined,
+            body.collectionId,
+        );
 
         return c.json({ success: true, data: result });
     } catch (error) {

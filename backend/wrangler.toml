@@ -6,18 +6,20 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "agentvault-db"
-database_id = "${D1_DATABASE_ID}"
+database_id = "80edda6d-6035-4f04-830c-7ed1ddd7516d"
 
 # ── Environment Variables ──
 # Set these via `wrangler secret put <KEY>` for sensitive values.
 # Non-sensitive defaults can go in [vars].
 [vars]
-OPNET_NETWORK = "regtest"
+OPNET_NETWORK = "testnet"
 OPNET_RPC_URL_REGTEST = "https://regtest.opnet.org"
 OPNET_RPC_URL_TESTNET = "https://testnet.opnet.org"
 OPNET_RPC_URL_MAINNET = "https://mainnet.opnet.org"
 PORT = "3001"
 ALLOW_DEV_SEED_LISTINGS = "0"
+MARKETPLACE_CONTRACT_ADDRESS = "opt1sqrhc7rme4j86ut53zg5vstfj06hxwv7j3ccnkt6f"
+NFT_HUB_CONTRACT_ADDRESS = "opt1sqpk4ctmal0nre495yvmydsd56wan5jus0qrjr04z"
 
 # ── Build ──
 [build]

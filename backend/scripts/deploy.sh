@@ -11,7 +11,9 @@ set -euo pipefail
 #   1. npm install (in backend/)
 #   2. wrangler login (one-time)
 #   3. Set D1_DATABASE_ID in backend/.env or environment
-#   4. Set PINATA_JWT in backend/.env (deploy script auto-syncs it to Wrangler secret)
+#   4. Set WALLET_MNEMONIC, PINATA_JWT in backend/.env
+#      (deploy script auto-syncs them to Wrangler secrets)
+#   5. Set MARKETPLACE_CONTRACT_ADDRESS, NFT_HUB_CONTRACT_ADDRESS in wrangler.toml [vars]
 #
 # Usage:
 #   ./scripts/deploy.sh                  # Deploy (default env)
@@ -80,6 +82,9 @@ prepare_nft_wasm() {
         cd ../contracts
         npm run build:nft:copy
     )
+
+    echo "==> Embedding NFT WASM into backend source..."
+    node scripts/embed-wasm.mjs
 }
 
 prepare_wrangler_config() {
@@ -94,21 +99,30 @@ prepare_wrangler_config() {
     sed -i '' "s|\${D1_DATABASE_ID}|$D1_DATABASE_ID|g" wrangler.toml
 }
 
-sync_pinata_secret() {
-    local target_env="${1:-}"
+sync_required_secret() {
+    local key="$1"
+    local target_env="${2:-}"
+    local value="${!key:-}"
 
-    if [ -z "${PINATA_JWT:-}" ]; then
-        echo "ERROR: PINATA_JWT is not set."
+    if [ -z "$value" ]; then
+        echo "ERROR: $key is not set."
         echo "Set it in backend/.env or export it as an environment variable."
         exit 1
     fi
 
-    echo "==> Syncing Wrangler secret: PINATA_JWT${target_env:+ (env: $target_env)}"
+    echo "==> Syncing Wrangler secret: $key${target_env:+ (env: $target_env)}"
     if [ -n "$target_env" ]; then
-        printf '%s' "$PINATA_JWT" | npx wrangler secret put PINATA_JWT --env "$target_env"
+        printf '%s' "$value" | npx wrangler secret put "$key" --env "$target_env"
     else
-        printf '%s' "$PINATA_JWT" | npx wrangler secret put PINATA_JWT
+        printf '%s' "$value" | npx wrangler secret put "$key"
     fi
+}
+
+sync_required_secrets() {
+    local target_env="${1:-}"
+
+    sync_required_secret "WALLET_MNEMONIC" "$target_env"
+    sync_required_secret "PINATA_JWT" "$target_env"
 }
 
 case "$ACTION" in
@@ -119,7 +133,7 @@ case "$ACTION" in
     deploy)
         prepare_nft_wasm
         prepare_wrangler_config
-        sync_pinata_secret
+        sync_required_secrets
         echo "==> Deploying to Cloudflare Workers..."
         npx wrangler deploy
         echo ""
@@ -128,7 +142,7 @@ case "$ACTION" in
     staging)
         prepare_nft_wasm
         prepare_wrangler_config
-        sync_pinata_secret "staging"
+        sync_required_secrets "staging"
         echo "==> Deploying to staging..."
         npx wrangler deploy --env staging
         echo ""
@@ -137,7 +151,7 @@ case "$ACTION" in
     production)
         prepare_nft_wasm
         prepare_wrangler_config
-        sync_pinata_secret "production"
+        sync_required_secrets "production"
         echo "==> Deploying to production..."
         npx wrangler deploy --env production
         echo ""
@@ -151,7 +165,6 @@ case "$ACTION" in
             echo "Required secrets:"
             echo "  WALLET_MNEMONIC              BIP39 mnemonic for agent wallet"
             echo "  PINATA_JWT                   Pinata API JWT for IPFS uploads"
-            echo "  MARKETPLACE_CONTRACT_ADDRESS Deployed marketplace contract address"
             exit 1
         fi
         echo "==> Setting secret: $KEY"

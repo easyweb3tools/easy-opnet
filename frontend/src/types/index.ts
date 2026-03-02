@@ -168,6 +168,7 @@ export interface ListRequest {
   readonly tokenId: string;
   readonly price: string;
   readonly auctionDuration?: number;
+  readonly nftContractAddress?: string;
 }
 
 export interface BidRequest {
@@ -199,7 +200,10 @@ export interface DeployCollectionRequest {
 }
 
 export interface DeployCollectionResponse {
+  readonly txHash?: string;
+  readonly collectionId?: string;
   readonly contractAddress: string;
+  readonly contractPublicKey?: string;
   readonly fundingTxHash: string;
   readonly deploymentTxHash: string;
 }

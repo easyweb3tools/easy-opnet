@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { ActivityFeed } from "./ActivityFeed";
 
 export default function ActivityPage() {
@@ -11,7 +12,9 @@ export default function ActivityPage() {
           Real-time marketplace activity feed — refreshes every 30 seconds
         </p>
       </div>
-      <ActivityFeed />
+      <Suspense>
+        <ActivityFeed />
+      </Suspense>
     </div>
   );
 }

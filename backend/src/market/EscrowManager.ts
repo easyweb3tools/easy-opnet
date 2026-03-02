@@ -26,7 +26,7 @@ interface ListingState {
  */
 export async function getListingState(listingId: string): Promise<ListingState | null> {
     try {
-        const contract = getMarketplaceContract(getWalletAddress());
+        const contract = await getMarketplaceContract(getWalletAddress());
         const getListingFn = (contract as unknown as Record<string, ContractMethod>).getListing;
         if (!getListingFn) return null;
 
@@ -62,7 +62,7 @@ export async function getListingState(listingId: string): Promise<ListingState |
  */
 export async function getListingCount(): Promise<number> {
     try {
-        const contract = getMarketplaceContract(getWalletAddress());
+        const contract = await getMarketplaceContract(getWalletAddress());
         const getListingCountFn = (contract as unknown as Record<string, ContractMethod>).getListingCount;
         if (!getListingCountFn) return 0;
 

@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fetchListings } from "@/lib/api";
 import { ListingCard } from "@/components/market/ListingCard";
 import { NFTGrid } from "@/components/nft/NFTGrid";
@@ -18,14 +19,24 @@ const SORT_OPTIONS: { value: ListingSortOption; label: string }[] = [
 
 const PAGE_SIZE = 12;
 
+function isListingSortOption(value: string | null): value is ListingSortOption {
+  return SORT_OPTIONS.some((option) => option.value === value);
+}
+
 export function ExploreContent() {
-  const [sort, setSort] = useState<ListingSortOption>("newest");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialSortParam = searchParams.get("sort");
+  const initialSort: ListingSortOption = isListingSortOption(initialSortParam)
+    ? initialSortParam
+    : "newest";
+  const [sort, setSort] = useState<ListingSortOption>(initialSort);
   const [allItems, setAllItems] = useState<Listing[]>([]);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ["listings", sort, offset],
     queryFn: () => fetchListings({ sort, limit: PAGE_SIZE, offset }),
   });
@@ -46,6 +57,22 @@ export function ExploreContent() {
     setOffset(0);
     setHasMore(true);
   }, [sort]);
+
+  // Keep sort in URL for shareable/filter-persistent view
+  useEffect(() => {
+    const currentSort = searchParams.get("sort");
+    const targetSort = sort === "newest" ? null : sort;
+    if (currentSort === targetSort) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (sort === "newest") {
+      params.delete("sort");
+    } else {
+      params.set("sort", sort);
+    }
+    const query = params.toString();
+    router.replace(query ? `/explore?${query}` : "/explore", { scroll: false });
+  }, [sort, router, searchParams]);
 
   // Infinite scroll via Intersection Observer
   const handleIntersect = useCallback(
@@ -95,12 +122,33 @@ export function ExploreContent() {
             <SkeletonCard key={i} />
           ))}
         </NFTGrid>
+      ) : isError && allItems.length === 0 ? (
+        <div className="rounded-2xl border border-error/30 bg-error/5 px-6 py-10 text-center">
+          <p className="text-sm text-text-secondary">
+            {(error as Error | null)?.message ?? "Failed to load listings."}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              void refetch();
+            }}
+            className="mt-4 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          >
+            Retry
+          </button>
+        </div>
       ) : (
         <NFTGrid>
           {allItems.map((listing) => (
             <ListingCard key={listing.id} listing={listing} />
           ))}
         </NFTGrid>
+      )}
+
+      {!isLoading && !isError && allItems.length === 0 && (
+        <p className="py-12 text-center text-sm text-text-secondary">
+          No listings found for this sort.
+        </p>
       )}
 
       {/* Infinite scroll sentinel */}
@@ -110,6 +158,23 @@ export function ExploreContent() {
       {isFetching && offset > 0 && (
         <div className="mt-6 flex justify-center">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-accent" />
+        </div>
+      )}
+
+      {isError && allItems.length > 0 && (
+        <div className="mt-6 flex flex-col items-center gap-3">
+          <p className="text-sm text-text-secondary">
+            {(error as Error | null)?.message ?? "Failed to load more listings."}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              void refetch();
+            }}
+            className="rounded-lg border border-border bg-surface px-4 py-2 text-sm text-text-primary transition-colors hover:bg-surface-hover"
+          >
+            Retry Loading
+          </button>
         </div>
       )}
 

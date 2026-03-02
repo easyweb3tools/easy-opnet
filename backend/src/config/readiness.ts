@@ -27,6 +27,16 @@ export function getMissingNftConfigKeys(): string[] {
     return missing;
 }
 
+export function getMissingHubConfigKeys(): string[] {
+    const missing = getMissingNftConfigKeys();
+
+    if (!hasValue(env.contracts.nftHub)) {
+        missing.push('NFT_HUB_CONTRACT_ADDRESS');
+    }
+
+    return missing;
+}
+
 export function getMissingWalletConfigKeys(): string[] {
     const missing: string[] = [];
 
